@@ -179,55 +179,143 @@ app.post('/api/files/upload', checkPin, (req, res) => {
   });
 });
 
+// ── Session persistence via tmux ──────────────────────────────────────
+const { execSync, execFileSync } = require('child_process');
+
+const TMUX = (() => { try { return execSync('command -v tmux', { stdio: ['ignore','pipe','ignore'] }).toString().trim(); } catch { return null; } })();
+
+function tmuxSessionExists(name) {
+  try { execFileSync(TMUX, ['has-session', '-t', name], { stdio: 'ignore' }); return true; } catch { return false; }
+}
+
+// List all webterm-managed tmux sessions: returns [{id, title}]
+app.get('/api/sessions', checkPin, (req, res) => {
+  if (!TMUX) return res.json({ tmux: false, sessions: [] });
+  try {
+    const out = execFileSync(TMUX, ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }).trim();
+    const sessions = out.split('\n')
+      .filter(s => s.startsWith('wt-'))
+      .map(s => ({ id: s.replace(/^wt-/, ''), name: s }));
+    res.json({ tmux: true, sessions });
+  } catch {
+    res.json({ tmux: true, sessions: [] });
+  }
+});
+
+app.delete('/api/sessions/:id', checkPin, (req, res) => {
+  if (!TMUX) return res.json({ success: false });
+  const name = 'wt-' + req.params.id.replace(/[^a-zA-Z0-9_-]/g, '');
+  try { execFileSync(TMUX, ['kill-session', '-t', name], { stdio: 'ignore' }); } catch {}
+  res.json({ success: true });
+});
+
 // ── WebSocket terminal ────────────────────────────────────────────────
+// Binary protocol (fast, no JSON per keystroke):
+//   Server → Client:  [type:1B][payload]
+//     0x00 = terminal data (UTF-8)
+//     0x01 = exit          (1B exit code)
+//     0x02 = error         (UTF-8 message)
+//   Client → Server:
+//     0x00 = input         (UTF-8)
+//     0x01 = resize        (4B: cols uint16LE, rows uint16LE)
+//     0x02 = ping          (no payload)
+
 wss.on('connection', (ws, req) => {
-  const url = new URL(req.url, `http://localhost`);
+  const url   = new URL(req.url, `http://localhost`);
   const token = url.searchParams.get('token');
 
-  if (PIN && token !== PIN) {
-    ws.close(1008, 'Unauthorized');
-    return;
-  }
+  if (PIN && token !== PIN) { ws.close(1008, 'Unauthorized'); return; }
 
-  const cols = parseInt(url.searchParams.get('cols')) || 80;
-  const rows = parseInt(url.searchParams.get('rows')) || 24;
-  const cwd = url.searchParams.get('cwd') || os.homedir();
+  const cols      = parseInt(url.searchParams.get('cols'))  || 80;
+  const rows      = parseInt(url.searchParams.get('rows'))  || 24;
+  const cwd       = url.searchParams.get('cwd')             || os.homedir();
+  const sessionId = (url.searchParams.get('session') || '').replace(/[^a-zA-Z0-9_-]/g, '');
+
+  const send = (type, payload) => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    const buf = Buffer.isBuffer(payload)
+      ? Buffer.concat([Buffer.from([type]), payload])
+      : Buffer.from(String.fromCharCode(type) + (payload || ''));
+    ws.send(buf);
+  };
 
   let proc;
   try {
-    proc = pty.spawn(SHELL, [], {
-      name: 'xterm-256color',
-      cols, rows, cwd,
-      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
-    });
+    if (TMUX && sessionId) {
+      // ── tmux mode: attach or create ──────────────────────────────
+      const tmuxName = 'wt-' + sessionId;
+      const exists   = tmuxSessionExists(tmuxName);
+
+      if (exists) {
+        // Resize existing session first
+        try { execFileSync(TMUX, ['resize-window', '-t', tmuxName, '-x', String(cols), '-y', String(rows)], { stdio: 'ignore' }); } catch {}
+        proc = pty.spawn(TMUX, ['attach-session', '-t', tmuxName], {
+          name: 'xterm-256color', cols, rows, cwd,
+          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
+        });
+      } else {
+        proc = pty.spawn(TMUX, ['new-session', '-s', tmuxName], {
+          name: 'xterm-256color', cols, rows, cwd,
+          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', SHELL }
+        });
+      }
+    } else {
+      // ── plain shell (no tmux / no session id) ───────────────────
+      proc = pty.spawn(SHELL, [], {
+        name: 'xterm-256color', cols, rows, cwd,
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
+      });
+    }
   } catch (e) {
-    ws.send(JSON.stringify({ type: 'error', data: `Failed to spawn shell: ${e.message}\r\n` }));
+    send(0x02, `Failed to spawn shell: ${e.message}\r\n`);
     ws.close();
     return;
   }
 
-  proc.onData(data => {
-    if (ws.readyState === WebSocket.OPEN)
-      ws.send(JSON.stringify({ type: 'data', data }));
+  proc.onData(data => send(0x00, data));
+
+  proc.onExit(() => {
+    // In tmux mode: detaching is an "exit" but the session lives on.
+    // Only send exit signal for plain shells.
+    if (!TMUX || !sessionId) send(0x01, Buffer.from([0]));
+    ws.close();
   });
 
-  proc.onExit(({ exitCode }) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'exit', exitCode }));
-      ws.close();
-    }
-  });
+  // Server-side keepalive ping every 30s
+  ws.isAlive = true;
+  const pingInterval = setInterval(() => {
+    if (!ws.isAlive) { clearInterval(pingInterval); ws.terminate(); return; }
+    ws.isAlive = false;
+    ws.ping();
+  }, 30000);
+  ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', raw => {
     try {
-      const msg = JSON.parse(raw);
-      if (msg.type === 'input') proc.write(msg.data);
-      if (msg.type === 'resize') proc.resize(Math.max(2, msg.cols), Math.max(2, msg.rows));
+      const buf  = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+      const type = buf[0];
+      if (type === 0x00) {
+        proc.write(buf.slice(1).toString('utf8'));
+      } else if (type === 0x01 && buf.length >= 5) {
+        const c = buf.readUInt16LE(1), r = buf.readUInt16LE(3);
+        proc.resize(Math.max(2, c), Math.max(2, r));
+        // Also resize the tmux window so it matches
+        if (TMUX && sessionId) {
+          try { execFileSync(TMUX, ['resize-window', '-t', 'wt-' + sessionId, '-x', String(c), '-y', String(r)], { stdio: 'ignore' }); } catch {}
+        }
+      }
+      // 0x02 client ping — no-op
     } catch {}
   });
 
-  ws.on('close', () => { try { proc.kill(); } catch {} });
-  ws.on('error', () => { try { proc.kill(); } catch {} });
+  const cleanup = () => {
+    clearInterval(pingInterval);
+    // In tmux mode just kill the pty (the session stays alive in tmux).
+    // In plain mode kill the shell process.
+    try { proc.kill(); } catch {}
+  };
+  ws.on('close', cleanup);
+  ws.on('error', cleanup);
 });
 
 server.listen(PORT, HOST, () => {

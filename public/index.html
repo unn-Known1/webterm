@@ -551,11 +551,26 @@ let homeDir = '';
 let ctxTarget = null;
 let renamePath = '';
 let editorPath = '';
+let hasTmux = false;
 let settings = {
   theme: 'tokyonight', fontSize: 14, font: "'SF Mono', 'Fira Code', Consolas, monospace",
   cursor: 'block', blink: true, scrollback: 5000, bell: false,
   mobilekeys: false, confirmclose: true
 };
+
+function uuid() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+}
+
+function saveTabState() {
+  const state = tabs.map(t => ({ id: t.id, sessionId: t.sessionId, title: t.title }));
+  try { localStorage.setItem('wt-tabs', JSON.stringify(state)); } catch {}
+}
+
+function loadTabState() {
+  try { return JSON.parse(localStorage.getItem('wt-tabs')) || []; } catch { return []; }
+}
 
 // ═══════════════════════════════════════════════════════
 // INIT
@@ -602,12 +617,24 @@ async function unlockApp() {
   currentPath = homeDir;
   document.getElementById('hostname-badge').textContent = info.hostname || '—';
 
+  // Check tmux availability
+  const sessInfo = await api('/api/sessions');
+  hasTmux = sessInfo.tmux === true;
+
   loadFiles(currentPath);
-  newTab();
   setupDragDrop();
   setupKeyboardShortcuts();
   setupMobileKeys();
   registerSW();
+
+  // Restore tabs from last session, or open a fresh one
+  const saved = loadTabState();
+  if (hasTmux && saved.length > 0) {
+    // Restore each saved tab (re-attaches to its tmux session)
+    for (const s of saved) newTab(s.title, s.sessionId);
+  } else {
+    newTab();
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -624,9 +651,10 @@ async function api(url, opts = {}) {
 // ═══════════════════════════════════════════════════════
 // TERMINAL TABS
 // ═══════════════════════════════════════════════════════
-function newTab(title) {
+function newTab(title, sessionId) {
   const id = ++tabCounter;
-  const tab = { id, title: title || `Term ${id}`, term: null, fitAddon: null, searchAddon: null, ws: null, el: null, wrapper: null };
+  const sid = sessionId || (hasTmux ? uuid() : null);
+  const tab = { id, sessionId: sid, title: title || `Term ${id}`, term: null, fitAddon: null, searchAddon: null, ws: null, el: null, wrapper: null, closed: false, reconnectDelay: 1000 };
   tabs.push(tab);
 
   // Tab button
@@ -652,6 +680,7 @@ function newTab(title) {
 
   activateTab(id);
   setTimeout(() => initTerminal(tab), 50);
+  saveTabState();
   return tab;
 }
 
@@ -670,12 +699,37 @@ function closeTab(e, id) {
   if (tabs.length === 1) { if (!confirm('Close last terminal?')) return; }
   const tab = tabs.find(t => t.id === id);
   if (!tab) return;
+  tab.closed = true;
+  clearInterval(tab.pingTimer);
+  clearTimeout(tab.reconnectTimer);
   tab.ws?.close();
   tab.term?.dispose();
   tab.el?.remove();
   tab.wrapper?.remove();
+  // Kill the backing tmux session so it doesn't pile up
+  if (tab.sessionId) api(`/api/sessions/${tab.sessionId}`, { method: 'DELETE' });
   tabs = tabs.filter(t => t.id !== id);
+  saveTabState();
   if (activeTabId === id && tabs.length > 0) activateTab(tabs[tabs.length - 1].id);
+}
+
+function reconnectTab(tab) {
+  if (tab.closed || !tab.term) return;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const cols = tab.term.cols, rows = tab.term.rows;
+  const sessionParam = tab.sessionId ? `&session=${encodeURIComponent(tab.sessionId)}` : '';
+  const wsUrl = `${proto}://${location.host}/ws?token=${encodeURIComponent(authToken)}&cols=${cols}&rows=${rows}&cwd=${encodeURIComponent(currentPath)}${sessionParam}`;
+  const ws = new WebSocket(wsUrl);
+  tab.ws = ws;
+  ws.binaryType = 'arraybuffer';
+  const sendInput = d => { if (ws.readyState !== WebSocket.OPEN) return; const enc = new TextEncoder().encode(d); const b = new Uint8Array(1+enc.length); b[0]=0; b.set(enc,1); ws.send(b.buffer); };
+  const sendResize = (c,r) => { if (ws.readyState !== WebSocket.OPEN) return; const dv=new DataView(new ArrayBuffer(5)); dv.setUint8(0,1); dv.setUint16(1,c,true); dv.setUint16(3,r,true); ws.send(dv.buffer); };
+  ws.onopen = () => { tab.reconnectDelay=1000; tab.term.writeln('\x1b[32m[Reconnected]\x1b[0m'); tab.pingTimer=setInterval(()=>{ if(ws.readyState===WebSocket.OPEN) ws.send(new Uint8Array([2]).buffer); },20000); };
+  ws.onmessage = e => { const b=new Uint8Array(e.data),t=b[0],p=b.slice(1); if(t===0) tab.term.write(p); else if(t===1) tab.term.writeln('\r\n\x1b[31m[Process exited]\x1b[0m'); else if(t===2) tab.term.writeln('\r\n\x1b[31m'+new TextDecoder().decode(p)+'\x1b[0m'); };
+  ws.onerror = () => {};
+  ws.onclose = () => { clearInterval(tab.pingTimer); if(tab.closed) return; tab.reconnectDelay=Math.min((tab.reconnectDelay||1000)*2,15000); tab.term.writeln(`\r\n\x1b[33m[Disconnected — reconnecting in ${tab.reconnectDelay/1000}s…]\x1b[0m`); tab.reconnectTimer=setTimeout(()=>{ if(!tab.closed) reconnectTab(tab); },tab.reconnectDelay); };
+  tab.term.onData(sendInput);
+  tab.term.onResize(({cols:c,rows:r})=>sendResize(c,r));
 }
 
 function initTerminal(tab) {
@@ -711,29 +765,61 @@ function initTerminal(tab) {
   // WebSocket
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const cols = term.cols, rows = term.rows;
-  const wsUrl = `${proto}://${location.host}/ws?token=${encodeURIComponent(authToken)}&cols=${cols}&rows=${rows}&cwd=${encodeURIComponent(currentPath)}`;
+  const sessionParam = tab.sessionId ? `&session=${encodeURIComponent(tab.sessionId)}` : '';
+  const wsUrl = `${proto}://${location.host}/ws?token=${encodeURIComponent(authToken)}&cols=${cols}&rows=${rows}&cwd=${encodeURIComponent(currentPath)}${sessionParam}`;
   const ws = new WebSocket(wsUrl);
   tab.ws = ws;
 
+  // Binary protocol (no JSON per keystroke = much less lag)
+  // S→C: byte 0 = 0x00 data | 0x01 exit | 0x02 error
+  // C→S: byte 0 = 0x00 input | 0x01 resize (4B LE) | 0x02 ping
+  ws.binaryType = 'arraybuffer';
+  tab.reconnectDelay = 1000;
+  tab.closed = false;
+
+  const sendInput = data => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    const enc = new TextEncoder().encode(data);
+    const buf = new Uint8Array(1 + enc.length);
+    buf[0] = 0x00; buf.set(enc, 1);
+    ws.send(buf.buffer);
+  };
+  const sendResize = (cols, rows) => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    const dv = new DataView(new ArrayBuffer(5));
+    dv.setUint8(0, 0x01); dv.setUint16(1, cols, true); dv.setUint16(3, rows, true);
+    ws.send(dv.buffer);
+  };
+
   ws.onopen = () => {
-    term.writeln('\x1b[32m Connected \x1b[0m');
+    tab.reconnectDelay = 1000;
+    // Client keepalive ping every 20s — Cloudflare kills idle WS at 100s
+    tab.pingTimer = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(new Uint8Array([0x02]).buffer);
+    }, 20000);
   };
+
   ws.onmessage = e => {
-    const msg = JSON.parse(e.data);
-    if (msg.type === 'data') term.write(msg.data);
-    if (msg.type === 'exit') { term.writeln('\r\n\x1b[31m[Process exited]\x1b[0m'); ws.close(); }
-    if (msg.type === 'error') term.writeln(`\r\n\x1b[31m${msg.data}\x1b[0m`);
+    const buf = new Uint8Array(e.data);
+    const type = buf[0], payload = buf.slice(1);
+    if (type === 0x00) term.write(payload);
+    else if (type === 0x01) term.writeln('\r\n\x1b[31m[Process exited]\x1b[0m');
+    else if (type === 0x02) term.writeln('\r\n\x1b[31m' + new TextDecoder().decode(payload) + '\x1b[0m');
   };
-  ws.onerror = () => term.writeln('\r\n\x1b[31m[WebSocket error]\x1b[0m');
-  ws.onclose = () => {};
 
-  term.onData(data => {
-    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data }));
-  });
+  ws.onerror = () => {};
 
-  term.onResize(({ cols, rows }) => {
-    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-  });
+  ws.onclose = () => {
+    clearInterval(tab.pingTimer);
+    if (tab.closed) return;
+    tab.reconnectDelay = Math.min((tab.reconnectDelay || 1000) * 2, 15000);
+    const secs = tab.reconnectDelay / 1000;
+    term.writeln(`\r\n\x1b[33m[Disconnected — reconnecting in ${secs}s…]\x1b[0m`);
+    tab.reconnectTimer = setTimeout(() => { if (!tab.closed) reconnectTab(tab); }, tab.reconnectDelay);
+  };
+
+  term.onData(data => sendInput(data));
+  term.onResize(({ cols, rows }) => sendResize(cols, rows));
 
   // Title updates from OSC
   term.onTitleChange(title => {
@@ -752,7 +838,12 @@ function getActiveTab() { return tabs.find(t => t.id === activeTabId); }
 
 function sendKey(key) {
   const tab = getActiveTab();
-  if (tab?.ws?.readyState === WebSocket.OPEN) tab.ws.send(JSON.stringify({ type: 'input', data: key }));
+  if (tab?.ws?.readyState === WebSocket.OPEN) {
+    const enc = new TextEncoder().encode(key);
+    const buf = new Uint8Array(1 + enc.length);
+    buf[0] = 0x00; buf.set(enc, 1);
+    tab.ws.send(buf.buffer);
+  }
   tab?.term?.focus();
 }
 

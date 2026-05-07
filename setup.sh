@@ -267,14 +267,13 @@ if command -v cloudflared &>/dev/null; then
     echo "  ${YELLOW}Your public URL will appear below (takes a few seconds):${RESET}"
     echo "  ${YELLOW}Press Ctrl+C to stop the tunnel (server keeps running).${RESET}"
     echo ""
-    # Run cloudflared and use --line-buffered to prevent grep from hiding the output
-    cloudflared tunnel --url "http://localhost:$PORT" 2>&1 | grep --line-buffered -E "https://[a-z0-9-]+\.trycloudflare\.com" | while read -r line; do
+    cloudflared tunnel --url "http://localhost:$PORT" 2>&1 | grep -E "https://[a-z0-9-]+\.trycloudflare\.com" | while read -r line; do
       URL=$(echo "$line" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com')
       if [ -n "$URL" ]; then
         echo ""
         echo "  ┌─────────────────────────────────────────────────────┐"
-        echo "  │  ${GREEN}${BOLD}Public URL (share this!):${RESET}   │"
-        echo "  │  ${CYAN}${BOLD}$URL${RESET}                         │"
+        echo "  │  ${GREEN}${BOLD}Public URL (share this!):${RESET}                          │"
+        echo "  │  ${CYAN}${BOLD}$URL${RESET}  │"
         echo "  │                                                     │"
         echo "  │  Bookmark it on your phone to use WebTerm anywhere! │"
         echo "  └─────────────────────────────────────────────────────┘"
