@@ -5,7 +5,7 @@ A self-hosted web terminal with file explorer. Access your machine from any brow
 ## Quick Start
 
 ```bash
-git clone https://github.com/unn-knonw1/webterm.git
+git clone https://github.com/unn-known1/webterm.git
 cd webterm
 chmod +x setup.sh stop.sh
 ./setup.sh
@@ -14,13 +14,13 @@ chmod +x setup.sh stop.sh
 ## One-liner — auto-launch with Cloudflare Tunnel
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/unn-knonw1/webterm/main/setup.sh
+curl -fsSL https://raw.githubusercontent.com/unn-known1/webterm/main/setup.sh | bash
 ```
 
 Or clone + tunnel in one shot:
 
 ```bash
-git clone https://github.com/unn-knonw1/webterm.git \
+git clone https://github.com/unn-known1/webterm.git \
   && cd webterm \
   && npm install \
   && node server.js & \
