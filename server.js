@@ -180,7 +180,8 @@ app.post('/api/files/upload', checkPin, (req, res) => {
 });
 
 // ── Session persistence via tmux ──────────────────────────────────────
-const { execSync, execFileSync } = require('child_process');
+// PATCHED: added `spawn` to child_process imports
+const { execSync, execFileSync, spawn } = require('child_process');
 
 const TMUX = (() => { try { return execSync('command -v tmux', { stdio: ['ignore','pipe','ignore'] }).toString().trim(); } catch { return null; } })();
 
@@ -317,6 +318,84 @@ wss.on('connection', (ws, req) => {
   ws.on('close', cleanup);
   ws.on('error', cleanup);
 });
+
+// ── MCP Exec API ──────────────────────────────────────────────────────
+// Added for MCP server integration. Two endpoints:
+//   POST /api/exec           – run command, wait, return full output (JSON)
+//   GET  /api/exec/stream    – run command, stream output as SSE
+
+// POST /api/exec
+// Body: { command: string, cwd?: string, timeout?: number (ms, default 60000) }
+// Response: { exitCode, stdout, stderr, duration }
+app.post('/api/exec', checkPin, (req, res) => {
+  const { command, cwd: reqCwd, timeout = 60000 } = req.body;
+  if (!command) return res.status(400).json({ error: 'command required' });
+
+  const execCwd = reqCwd || os.homedir();
+  let stdout = '', stderr = '';
+  const start = Date.now();
+
+  const proc = spawn('/bin/bash', ['-c', command], {
+    cwd: execCwd,
+    env: { ...process.env },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  proc.stdout.on('data', d => { stdout += d.toString(); });
+  proc.stderr.on('data', d => { stderr += d.toString(); });
+
+  const timer = setTimeout(() => {
+    try { proc.kill('SIGKILL'); } catch {}
+    if (!res.headersSent)
+      res.status(408).json({ error: 'timeout', stdout, stderr, duration: Date.now() - start });
+  }, timeout);
+
+  proc.on('close', code => {
+    clearTimeout(timer);
+    if (res.headersSent) return;
+    res.json({ exitCode: code, stdout, stderr, duration: Date.now() - start });
+  });
+
+  proc.on('error', e => {
+    clearTimeout(timer);
+    if (res.headersSent) return;
+    res.status(500).json({ error: e.message, stdout, stderr });
+  });
+});
+
+// GET /api/exec/stream?command=<cmd>&cwd=<path>   (Server-Sent Events)
+// Each SSE event: data: {"type":"stdout"|"stderr"|"exit"|"error","data":<string|number>}
+// type=exit carries the numeric exit code; stream ends after it.
+app.get('/api/exec/stream', checkPin, (req, res) => {
+  const { command, cwd: reqCwd } = req.query;
+  if (!command) { res.status(400).end('command required'); return; }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (type, data) => {
+    if (!res.writableEnded) res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+  };
+
+  const proc = spawn('/bin/bash', ['-c', command], {
+    cwd: reqCwd || os.homedir(),
+    env: { ...process.env },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  proc.stdout.on('data', d => send('stdout', d.toString()));
+  proc.stderr.on('data', d => send('stderr', d.toString()));
+
+  proc.on('close', code => { send('exit', code); res.end(); });
+  proc.on('error', e => { send('error', e.message); res.end(); });
+
+  // Kill child if client disconnects
+  req.on('close', () => { try { proc.kill(); } catch {} });
+});
+
+// ─────────────────────────────────────────────────────────────────────
 
 server.listen(PORT, HOST, () => {
   console.log(`\n  WebTerm running → http://localhost:${PORT}\n`);
