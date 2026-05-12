@@ -1,111 +1,53 @@
-# WebTun — Self-Hosted Web Terminal + Cloudflare Tunnel
+# 🌐 WebTun — Self-Hosted Web Terminal
 
-**Access your server's shell, files, and code editor from any browser — phone, tablet, or desktop.** WebTun combines a full-featured web terminal with a built-in file explorer and one-command Cloudflare Tunnel setup for secure remote access without port forwarding.
+Access your Linux server from **any browser, phone, or tablet** — no VPN, no SSH client needed.
 
-## Quick Start
+![Terminal](https://img.shields.io/badge/Terminal-Web--native-blue?style=for-the-badge)
+![PWA](https://img.shields.io/badge/PWA-Installable-cyan?style=for-the-badge)
+![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-orange?style=for-the-badge)
+
+## ✨ Features
+
+- **🖥️ Full terminal** — node-pty backed, real shell session in your browser
+- **📁 File explorer** — browse and manage files without leaving the tab
+- **🔢 Multi-tab** — open multiple shell sessions side by side
+- **📱 Mobile-friendly PWA** — install as an app on iOS/Android
+- **🔒 Self-hosted** — your server, your rules, zero third-party involvement
+- **⚡ Cloudflare Tunnel** — expose without opening ports or configuring firewalls
+
+## 🚀 Quick Start
 
 ```bash
+# One-command install
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/unn-known1/webtun/main/install.sh)"
+
+# Or run manually
 git clone https://github.com/unn-known1/webtun.git
 cd webtun
-chmod +x setup.sh stop.sh
-./setup.sh
-```
-
-## One-liner — auto-launch with Cloudflare Tunnel
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/unn-known1/webtun/main/setup.sh | bash
-```
-
-Or clone + tunnel in one shot:
-
-```bash
-git clone https://github.com/unn-known1/webtun.git \
-  && cd webtun \
-  && npm install \
-  && node server.js & \
-  && cloudflared tunnel --url http://localhost:3000
-```
-
-That's it. The script will:
-1. Install Node.js if missing
-2. Install npm dependencies (including `node-pty` for real shell access)
-3. Ask for a port and optional PIN
-4. Start the server
-5. Optionally install as a systemd service
-6. Optionally start a Cloudflare Tunnel for remote access (no port forwarding needed)
-
-## Features
-
-| Feature | Details |
-|---|---|
-| **Real shell** | Full PTY via node-pty — bash, zsh, fish, etc. |
-| **Multiple tabs** | Open unlimited terminal sessions |
-| **File explorer** | Browse, upload, download, rename, delete |
-| **Code editor** | Edit files in-browser with syntax highlighting |
-| **Mobile keyboard** | ESC, TAB, arrows, Ctrl+C/D/Z/L, Del, Home/End |
-| **Search** | In-terminal search with Ctrl+F |
-| **Themes** | Tokyo Night, Dracula, Gruvbox, Solarized, Monokai, Light |
-| **PIN protection** | Optional PIN to block unauthorized access |
-| **PWA** | Installable on iOS/Android/Desktop |
-| **Drag & drop upload** | Drop files anywhere to upload |
-| **Cloudflare Tunnel** | Public HTTPS URL, no port forwarding |
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+T` | New terminal tab |
-| `Ctrl+W` | Close current tab |
-| `Ctrl+B` | Toggle file explorer |
-| `Ctrl+F` | Search in terminal |
-| `Ctrl+Shift+→` / `←` | Cycle tabs |
-| `Ctrl+S` (in editor) | Save file |
-
-## Config (.env)
-
-```env
-PORT=3000
-HOST=0.0.0.0
-PIN=yourpin
-# SHELL=/usr/bin/zsh
-```
-
-## Manual Start
-
-```bash
-git clone https://github.com/unn-known1/webtun.git
-cd webtun
-npm install
-
-# Start server
 node server.js
-
-# Start with Cloudflare tunnel
-cloudflared tunnel --url http://localhost:3000
-
-# Or both in one command
-node server.js & cloudflared tunnel --url http://localhost:3000
-
-# Stop server
-./stop.sh
 ```
 
-## PWA / Desktop App
+Then create a Cloudflare Tunnel:
+```bash
+cloudflared tunnel create webtun
+cloudflared tunnel route dns webtun yourdomain.com
+cloudflared tunnel run webtun
+```
 
-- **iOS**: Open in Safari → Share → Add to Home Screen
-- **Android**: Open in Chrome → Menu → Install App  
-- **Desktop**: Chrome/Edge address bar → install icon
+## 🏗️ Stack
 
-## Security Notes
+- **Frontend:** HTML + Vanilla JS (no framework overhead)
+- **Backend:** Node.js + node-pty
+- **Tunnel:** Cloudflare Tunnel (cloudflared)
+- **Protocol:** WebSocket + xterm.js
 
-- Always set a PIN if the server will be accessible outside your local network
-- The Cloudflare Tunnel URL is temporary and changes each restart; for a permanent URL, set up a named Cloudflare tunnel
-- Traffic over the tunnel is encrypted (HTTPS)
-- For extra security, bind to localhost and only expose via the tunnel: `HOST=127.0.0.1`
+## 📦 Use Cases
 
-## Requirements
+- Access your home server from anywhere
+- Run CLI tools on the go from your phone
+- Give someone terminal access without SSH keys
+- Emergency server access without a laptop
 
-- Node.js ≥ 18
-- Linux/macOS (node-pty has limited Windows support; use WSL on Windows)
-- Python 3 + make + g++ (for building node-pty — usually pre-installed)
+## ⭐ If this helped you, star the repo!
+
+MIT License — built with 💻 by [Gaurang Patel](https://github.com/unn-known1)
