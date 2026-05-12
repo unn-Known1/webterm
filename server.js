@@ -395,6 +395,111 @@ app.get('/api/exec/stream', checkPin, (req, res) => {
   req.on('close', () => { try { proc.kill(); } catch {} });
 });
 
+// ── File search (fuzzy finder) ──────────────────────────────────────
+app.get('/api/search', checkPin, (req, res) => {
+  const q = (req.query.q || '').trim();
+  const dir = req.query.path || os.homedir();
+  if (!q || q.length < 1) return res.json({ results: [] });
+
+  const maxResults = 50;
+  const results = [];
+
+  try {
+    const { execFileSync } = require('child_process');
+    const out = execFileSync('find', [dir, '-maxdepth', '4', '-iname', `*${q}*`, '-type', 'f', '-o', '-type', 'd', '-iname', `*${q}*`], {
+      encoding: 'utf8', timeout: 5000, maxBuffer: 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const lines = out.trim().split('\n').filter(Boolean);
+    for (const line of lines) {
+      if (results.length >= maxResults) break;
+      try {
+        const st = fs.statSync(line);
+        results.push({
+          path: line,
+          name: path.basename(line),
+          isDir: st.isDirectory(),
+          dir: path.dirname(line)
+        });
+      } catch {}
+    }
+  } catch {}
+
+  res.json({ results });
+});
+
+// ── System stats ────────────────────────────────────────────────────
+app.get('/api/system', checkPin, (req, res) => {
+  const { execSync } = require('child_process');
+  const cpus = os.cpus();
+  const cpuModel = cpus.length > 0 ? cpus[0].model : 'unknown';
+  const cpuCount = cpus.length;
+  const loadAvg = os.loadavg();
+
+  let cpuUsage = 0;
+  try {
+    const procStat = fs.readFileSync('/proc/stat', 'utf8');
+    const cpuLine = procStat.split('\n').find(l => l.startsWith('cpu '));
+    if (cpuLine) {
+      const parts = cpuLine.trim().split(/\s+/).slice(1).map(Number);
+      const total = parts.reduce((a, b) => a + b, 0);
+      const idle = parts[3] || 0;
+      cpuUsage = Math.round((1 - idle / total) * 100);
+    }
+  } catch {}
+
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const memPercent = Math.round((usedMem / totalMem) * 100);
+
+  let disk = [];
+  try {
+    const dfOut = execSync('df -h /', { encoding: 'utf8', timeout: 3000 });
+    const lines = dfOut.trim().split('\n');
+    if (lines.length > 1) {
+      const parts = lines[1].split(/\s+/);
+      disk = [{ filesystem: parts[0], size: parts[1], used: parts[2], avail: parts[3], usePercent: parts[4], mounted: parts[5] }];
+    }
+  } catch {}
+
+  let processes = [];
+  try {
+    const psOut = execSync('ps aux --sort=-%cpu | head -15', { encoding: 'utf8', timeout: 3000 });
+    const lines = psOut.trim().split('\n');
+    if (lines.length > 0) {
+      const header = lines[0].trim().split(/\s+/);
+      const uidIdx = header.indexOf('USER');
+      const pidIdx = header.indexOf('PID');
+      const cpuIdx = header.indexOf('%CPU');
+      const memIdx = header.indexOf('%MEM');
+      const cmdIdx = 10;
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].trim().split(/\s+/);
+        if (parts.length > cmdIdx) {
+          processes.push({
+            user: parts[uidIdx] || '',
+            pid: parts[pidIdx] || '',
+            cpu: parts[cpuIdx] || '',
+            mem: parts[memIdx] || '',
+            cmd: parts.slice(cmdIdx).join(' ')
+          });
+        }
+      }
+    }
+  } catch {}
+
+  res.json({
+    hostname: os.hostname(),
+    platform: os.platform(),
+    uptime: os.uptime(),
+    cpu: { model: cpuModel, count: cpuCount, usage: cpuUsage, loadAvg },
+    memory: { total: totalMem, free: freeMem, used: usedMem, percent: memPercent },
+    disk,
+    processes
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────
 
 server.listen(PORT, HOST, () => {

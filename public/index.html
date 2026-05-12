@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1b26">
-<title>WebTerm</title>
+<title>WebTun — Self-Hosted Web Terminal</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
@@ -247,6 +247,66 @@ svg { display: block; }
 /* ═══════════════════════════════════════════════════════
    MOBILE RESPONSIVE
    ═══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════
+   BOOKMARKS
+   ═══════════════════════════════════════════════════════ */
+#bookmarks-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; font-size: 11px; color: var(--fg2);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0; cursor: pointer;
+}
+#bookmarks-header:hover { color: var(--fg); }
+#bookmarks-list { max-height: 0; overflow: hidden; transition: max-height 0.2s; flex-shrink: 0; }
+#bookmarks-list.open { max-height: 200px; overflow-y: auto; }
+.bookmark-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 10px; font-size: 12px; cursor: pointer;
+  border-bottom: 1px solid transparent;
+}
+.bookmark-item:hover { background: var(--bg3); }
+.bookmark-item .bm-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); }
+.bookmark-item .bm-remove { opacity: 0.3; font-size: 14px; line-height: 1; width: 16px; text-align: center; }
+.bookmark-item .bm-remove:hover { opacity: 1; color: var(--red); }
+
+/* ═══════════════════════════════════════════════════════
+   FUZZY FINDER
+   ═══════════════════════════════════════════════════════ */
+#finder-overlay .modal { width: 520px; max-width: 95vw; padding: 12px; }
+#finder-input { width: 100%; font-size: 16px; height: 40px; margin-bottom: 8px; }
+#finder-results { max-height: 300px; overflow-y: auto; }
+.finder-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: var(--radius); cursor: pointer; font-size: 13px;
+}
+.finder-item:hover, .finder-item.selected { background: var(--bg4); }
+.finder-item .fi-icon { flex-shrink: 0; }
+.finder-item .fi-name { font-weight: 600; }
+.finder-item .fi-dir { font-size: 11px; color: var(--fg2); margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+#finder-empty { text-align: center; color: var(--fg2); padding: 20px; font-size: 13px; }
+
+/* ═══════════════════════════════════════════════════════
+   SYSTEM STATS
+   ═══════════════════════════════════════════════════════ */
+#sys-overlay .modal { width: 520px; max-width: 95vw; }
+.sys-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.sys-card {
+  background: var(--bg3); border-radius: var(--radius); padding: 12px;
+  border: 1px solid var(--border);
+}
+.sys-card h3 { font-size: 11px; color: var(--fg2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.sys-card .sys-val { font-size: 20px; font-weight: 700; color: var(--accent); }
+.sys-card .sys-sub { font-size: 11px; color: var(--fg2); margin-top: 2px; }
+.sys-bar { height: 4px; background: var(--bg4); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.sys-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+.sys-bar-fill.warn { background: var(--yellow); }
+.sys-bar-fill.danger { background: var(--red); }
+.sys-table-wrap { max-height: 180px; overflow-y: auto; }
+.sys-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.sys-table th { text-align: left; padding: 4px 6px; color: var(--fg2); border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg2); }
+.sys-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); }
+.sys-table tr:hover td { background: var(--bg3); }
+
 @media (max-width: 768px) {
   #mobile-keys { display: flex; }
   #sidebar { position: absolute; left: 0; top: var(--header-h); bottom: 0; z-index: 30; width: var(--sidebar-w); transform: translateX(-100%); transition: transform 0.2s; }
@@ -255,6 +315,7 @@ svg { display: block; }
   #hostname-badge { display: none; }
   #search-input { width: 150px; }
   .modal { min-width: unset; width: 95vw; }
+  .sys-grid { grid-template-columns: 1fr; }
 }
 @media (min-width: 769px) {
   #sidebar-toggle-mobile { display: none; }
@@ -266,7 +327,7 @@ svg { display: block; }
 <!-- PIN Screen -->
 <div id="pin-screen">
   <div id="pin-box">
-    <h1>⌨ WebTerm</h1>
+    <h1>⌨ WebTun</h1>
     <p>Enter PIN to continue</p>
     <input id="pin-input" type="password" placeholder="••••" autocomplete="off" maxlength="32">
     <div id="pin-error"></div>
@@ -280,7 +341,7 @@ svg { display: block; }
 <div id="app" style="display:none">
   <!-- Header -->
   <div id="header">
-    <span id="logo">⌨ WT</span>
+    <span id="logo">⌨ WebTun</span>
     <span id="hostname-badge">—</span>
     <div class="header-spacer"></div>
     <button class="icon-btn" id="sidebar-toggle" title="Toggle Explorer (Ctrl+B)" onclick="toggleSidebar()">
@@ -291,6 +352,9 @@ svg { display: block; }
     </button>
     <button class="icon-btn" title="New Terminal (Ctrl+T)" onclick="newTab()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button class="icon-btn" title="System Stats" onclick="openSystemStats()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
     </button>
     <button class="icon-btn" title="Settings" onclick="openSettings()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -311,11 +375,17 @@ svg { display: block; }
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </button>
       </div>
+      <div id="bookmarks-header" onclick="toggleBookmarks()">📍 Bookmarks <span id="bm-count" style="margin-left:auto;font-size:10px"></span></div>
+      <div id="bookmarks-list"></div>
       <div id="file-breadcrumb">/</div>
       <div id="file-list-wrap">
         <div id="file-list"></div>
       </div>
       <div id="sidebar-footer">
+        <button class="sidebar-action-btn" onclick="bookmarkCurrentDir()" title="Bookmark current directory">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          Bookmark
+        </button>
         <button class="sidebar-action-btn" onclick="uploadFiles()" title="Upload files">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Upload
@@ -487,6 +557,62 @@ svg { display: block; }
   </div>
 </div>
 
+<!-- Fuzzy Finder Modal -->
+<div class="overlay" id="finder-overlay">
+  <div class="modal" style="padding:12px">
+    <input id="finder-input" type="text" placeholder="Search files and folders…" autocomplete="off" oninput="doFinderSearch()" onkeydown="finderKeydown(event)">
+    <div id="finder-results"></div>
+    <div id="finder-empty">Start typing to search files</div>
+  </div>
+</div>
+
+<!-- System Stats Modal -->
+<div class="overlay" id="sys-overlay">
+  <div class="modal">
+    <h2>🖥 System Stats</h2>
+    <div id="sys-content">
+      <div class="sys-grid">
+        <div class="sys-card">
+          <h3>CPU</h3>
+          <div class="sys-val" id="sys-cpu-val">—</div>
+          <div class="sys-sub" id="sys-cpu-sub"></div>
+          <div class="sys-bar"><div class="sys-bar-fill" id="sys-cpu-bar" style="width:0%"></div></div>
+        </div>
+        <div class="sys-card">
+          <h3>Memory</h3>
+          <div class="sys-val" id="sys-mem-val">—</div>
+          <div class="sys-sub" id="sys-mem-sub"></div>
+          <div class="sys-bar"><div class="sys-bar-fill" id="sys-mem-bar" style="width:0%"></div></div>
+        </div>
+        <div class="sys-card">
+          <h3>Disk (/)</h3>
+          <div class="sys-val" id="sys-disk-val">—</div>
+          <div class="sys-sub" id="sys-disk-sub"></div>
+          <div class="sys-bar"><div class="sys-bar-fill" id="sys-disk-bar" style="width:0%"></div></div>
+        </div>
+        <div class="sys-card">
+          <h3>Uptime</h3>
+          <div class="sys-val" id="sys-uptime-val">—</div>
+          <div class="sys-sub" id="sys-uptime-sub"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Top Processes by CPU</h3>
+        <div class="sys-table-wrap">
+          <table class="sys-table" id="sys-proc-table">
+            <thead><tr><th>PID</th><th>User</th><th>CPU%</th><th>Mem%</th><th>Command</th></tr></thead>
+            <tbody id="sys-proc-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="refreshSystemStats()">Refresh</button>
+      <button class="btn btn-ghost" onclick="closeOverlay('sys-overlay')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Rename Modal -->
 <div class="overlay" id="rename-overlay">
   <div class="modal">
@@ -622,6 +748,7 @@ async function unlockApp() {
   hasTmux = sessInfo.tmux === true;
 
   loadFiles(currentPath);
+  renderBookmarks();
   setupDragDrop();
   setupKeyboardShortcuts();
   setupMobileKeys();
@@ -668,6 +795,31 @@ function newTab(title, sessionId) {
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>`;
   tabEl.addEventListener('click', e => { if (!e.target.closest('.tab-close')) activateTab(id); });
+  tabEl.querySelector('.tab-title').addEventListener('dblclick', e => {
+    e.stopPropagation();
+    const span = e.target;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = tab.title;
+    input.style.width = Math.max(60, tab.title.length * 9) + 'px';
+    input.style.height = '22px';
+    input.style.fontSize = '12px';
+    input.style.padding = '0 6px';
+    span.replaceWith(input);
+    input.focus();
+    input.select();
+    const done = () => {
+      const val = input.value.trim() || tab.title;
+      tab.title = val;
+      const newSpan = document.createElement('span');
+      newSpan.className = 'tab-title';
+      newSpan.textContent = val;
+      input.replaceWith(newSpan);
+      saveTabState();
+    };
+    input.addEventListener('blur', done);
+    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); } if (ev.key === 'Escape') { ev.preventDefault(); input.value = tab.title; input.blur(); } });
+  });
   document.getElementById('tab-bar').insertBefore(tabEl, document.getElementById('new-tab-btn'));
   tab.el = tabEl;
 
@@ -1210,13 +1362,17 @@ function toggleSidebar() {
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', e => {
     const ctrl = e.ctrlKey || e.metaKey;
+    if (ctrl && e.key === 'p') { e.preventDefault(); openFinder(); }
     if (ctrl && e.key === 't') { e.preventDefault(); newTab(); }
     if (ctrl && e.key === 'b') { e.preventDefault(); toggleSidebar(); }
     if (ctrl && e.key === 'f') { e.preventDefault(); toggleSearch(); }
     if (ctrl && e.key === 'w') { e.preventDefault(); if (activeTabId) closeTab(e, activeTabId); }
     if (ctrl && e.shiftKey && e.key === 'ArrowRight') { e.preventDefault(); cycleTab(1); }
     if (ctrl && e.shiftKey && e.key === 'ArrowLeft') { e.preventDefault(); cycleTab(-1); }
-    if (e.key === 'Escape' && document.getElementById('search-bar').classList.contains('open')) closeSearch();
+    if (e.key === 'Escape') {
+      if (document.getElementById('search-bar').classList.contains('open')) closeSearch();
+      if (document.getElementById('finder-overlay').classList.contains('open')) closeOverlay('finder-overlay');
+    }
   });
 }
 
@@ -1283,6 +1439,142 @@ function toast(msg, type = 'info') {
 function showPinScreen() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('pin-screen').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════════════════
+// BOOKMARKS
+// ═══════════════════════════════════════════════════════
+function getBookmarks() {
+  try { return JSON.parse(localStorage.getItem('wt-bookmarks')) || []; } catch { return []; }
+}
+function saveBookmarks(bm) { localStorage.setItem('wt-bookmarks', JSON.stringify(bm)); renderBookmarks(); }
+
+function renderBookmarks() {
+  const list = document.getElementById('bookmarks-list');
+  const bm = getBookmarks();
+  document.getElementById('bm-count').textContent = bm.length ? `${bm.length}` : '';
+  list.innerHTML = '';
+  if (bm.length === 0) { list.classList.remove('open'); return; }
+  list.classList.add('open');
+  bm.forEach((b, i) => {
+    const div = document.createElement('div');
+    div.className = 'bookmark-item';
+    div.innerHTML = `<span class="bm-name">${b.name}</span><span style="font-size:10px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${b.path}</span><span class="bm-remove" title="Remove">×</span>`;
+    div.querySelector('.bm-name').addEventListener('click', () => loadFiles(b.path));
+    div.querySelector('.bm-remove').addEventListener('click', e => { e.stopPropagation(); const bm2 = getBookmarks(); bm2.splice(i,1); saveBookmarks(bm2); });
+    list.appendChild(div);
+  });
+}
+
+function bookmarkCurrentDir() {
+  const bm = getBookmarks();
+  if (bm.some(b => b.path === currentPath)) { toast('Already bookmarked', 'info'); return; }
+  bm.push({ name: currentPath.split('/').filter(Boolean).pop() || '/', path: currentPath });
+  saveBookmarks(bm);
+  toast('Bookmarked', 'success');
+}
+
+let bookmarksOpen = true;
+function toggleBookmarks() {
+  bookmarksOpen = !bookmarksOpen;
+  document.getElementById('bookmarks-list').classList.toggle('open', bookmarksOpen);
+}
+
+// ═══════════════════════════════════════════════════════
+// FUZZY FINDER (Ctrl+P)
+// ═══════════════════════════════════════════════════════
+let finderTimer = null;
+let finderIdx = -1;
+
+function openFinder() {
+  document.getElementById('finder-input').value = '';
+  document.getElementById('finder-results').innerHTML = '';
+  document.getElementById('finder-empty').textContent = 'Start typing to search files';
+  finderIdx = -1;
+  openOverlay('finder-overlay');
+  setTimeout(() => document.getElementById('finder-input').focus(), 100);
+}
+
+function doFinderSearch() {
+  clearTimeout(finderTimer);
+  const q = document.getElementById('finder-input').value.trim();
+  const results = document.getElementById('finder-results');
+  const empty = document.getElementById('finder-empty');
+  if (q.length < 2) { results.innerHTML = ''; empty.textContent = 'Type at least 2 characters'; return; }
+  empty.textContent = 'Searching…';
+  finderTimer = setTimeout(async () => {
+    const data = await api(`/api/search?q=${encodeURIComponent(q)}&path=${encodeURIComponent(currentPath)}`);
+    results.innerHTML = '';
+    if (!data.results || data.results.length === 0) { empty.textContent = 'No results found'; return; }
+    empty.textContent = '';
+    finderIdx = -1;
+    data.results.forEach((r, i) => {
+      const div = document.createElement('div');
+      div.className = 'finder-item';
+      div.dataset.idx = i;
+      div.innerHTML = `<span class="fi-icon">${r.isDir ? '📁' : '📄'}</span><span class="fi-name">${r.name}</span><span class="fi-dir">${r.dir}</span>`;
+      div.addEventListener('click', () => { closeOverlay('finder-overlay'); if (r.isDir) loadFiles(r.path); else openFileEditor(r.path); });
+      div.addEventListener('mouseenter', () => { document.querySelectorAll('.finder-item.selected').forEach(el => el.classList.remove('selected')); div.classList.add('selected'); finderIdx = i; });
+      results.appendChild(div);
+    });
+  }, 200);
+}
+
+function finderKeydown(e) {
+  const items = document.querySelectorAll('.finder-item');
+  if (e.key === 'ArrowDown') { e.preventDefault(); if (finderIdx < items.length - 1) { finderIdx++; items.forEach((el,i) => el.classList.toggle('selected', i === finderIdx)); } }
+  if (e.key === 'ArrowUp') { e.preventDefault(); if (finderIdx > 0) { finderIdx--; items.forEach((el,i) => el.classList.toggle('selected', i === finderIdx)); } }
+  if (e.key === 'Enter' && finderIdx >= 0 && items[finderIdx]) { e.preventDefault(); items[finderIdx].click(); }
+  if (e.key === 'Escape') closeOverlay('finder-overlay');
+}
+
+// ═══════════════════════════════════════════════════════
+// SYSTEM STATS
+// ═══════════════════════════════════════════════════════
+function openSystemStats() {
+  openOverlay('sys-overlay');
+  document.getElementById('sys-content').innerHTML = '<div style="text-align:center;padding:20px;color:var(--fg2)">Loading…</div>';
+  refreshSystemStats();
+}
+
+async function refreshSystemStats() {
+  const data = await api('/api/system');
+  if (!data || !data.cpu) { document.getElementById('sys-content').innerHTML = '<div style="text-align:center;padding:20px;color:var(--red)">Failed to load system stats</div>'; return; }
+
+  const fmt = (bytes) => { if (bytes < 1024) return bytes + ' B'; if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'; if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB'; return (bytes / 1073741824).toFixed(1) + ' GB'; };
+  const fmtUptime = (s) => { const d = Math.floor(s / 86400); const h = Math.floor((s % 86400) / 3600); const m = Math.floor((s % 3600) / 60); return `${d}d ${h}h ${m}m`; };
+
+  document.getElementById('sys-cpu-val').textContent = `${data.cpu.usage}%`;
+  document.getElementById('sys-cpu-sub').textContent = `${data.cpu.count} cores · ${data.cpu.loadAvg[0].toFixed(2)} avg`;
+  document.getElementById('sys-cpu-bar').style.width = Math.min(data.cpu.usage, 100) + '%';
+  document.getElementById('sys-cpu-bar').className = 'sys-bar-fill' + (data.cpu.usage > 80 ? ' danger' : data.cpu.usage > 50 ? ' warn' : '');
+
+  document.getElementById('sys-mem-val').textContent = `${data.memory.percent}%`;
+  document.getElementById('sys-mem-sub').textContent = `${fmt(data.memory.used)} / ${fmt(data.memory.total)}`;
+  document.getElementById('sys-mem-bar').style.width = Math.min(data.memory.percent, 100) + '%';
+  document.getElementById('sys-mem-bar').className = 'sys-bar-fill' + (data.memory.percent > 80 ? ' danger' : data.memory.percent > 50 ? ' warn' : '');
+
+  if (data.disk && data.disk.length > 0) {
+    const d = data.disk[0];
+    const pct = parseInt(d.usePercent);
+    document.getElementById('sys-disk-val').textContent = d.usePercent;
+    document.getElementById('sys-disk-sub').textContent = `${d.used} / ${d.size}`;
+    document.getElementById('sys-disk-bar').style.width = Math.min(pct, 100) + '%';
+    document.getElementById('sys-disk-bar').className = 'sys-bar-fill' + (pct > 80 ? ' danger' : pct > 50 ? ' warn' : '');
+  }
+
+  document.getElementById('sys-uptime-val').textContent = fmtUptime(data.uptime);
+  document.getElementById('sys-uptime-sub').textContent = data.hostname + ' · ' + data.platform;
+
+  const tbody = document.getElementById('sys-proc-body');
+  tbody.innerHTML = '';
+  if (data.processes) {
+    data.processes.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.pid}</td><td>${p.user}</td><td>${p.cpu}</td><td>${p.mem}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.cmd}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════════════
