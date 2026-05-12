@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # ─────────────────────────────────────────────────────────────
-#  WebTerm Setup Script
+#  WebTun Setup Script
 # ─────────────────────────────────────────────────────────────
 BOLD=$'\033[1m'; RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'
 BLUE=$'\033[34m'; CYAN=$'\033[36m'; RESET=$'\033[0m'
@@ -18,7 +18,7 @@ cat << 'BANNER'
    ╚══╝╚══╝ ╚══════╝╚═════╝    ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝
 BANNER
 echo ""
-echo "  ${BOLD}${CYAN}Web Terminal + File Explorer${RESET}"
+echo "  ${BOLD}${CYAN}WebTun — Web Terminal + Cloudflare Tunnel${RESET}"
 echo "  ─────────────────────────────────"
 echo ""
 }
@@ -186,12 +186,12 @@ setup_systemd() {
   read -rp "  Install as systemd service (auto-start on boot)? [y/N]: " INSTALL_SERVICE
   if [[ "${INSTALL_SERVICE,,}" != "y" ]]; then return; fi
 
-  SERVICE_FILE="/etc/systemd/system/webterm.service"
+  SERVICE_FILE="/etc/systemd/system/webtun.service"
   NODE_PATH="$(command -v node)"
   
   sudo tee "$SERVICE_FILE" > /dev/null << EOF
 [Unit]
-Description=WebTerm - Web Terminal Server
+Description=WebTun - Web Terminal Server
 After=network.target
 
 [Service]
@@ -209,17 +209,17 @@ WantedBy=multi-user.target
 EOF
 
   sudo systemctl daemon-reload
-  sudo systemctl enable webterm
-  sudo systemctl start webterm
+  sudo systemctl enable webtun
+  sudo systemctl start webtun
   success "Systemd service installed and started"
-  echo "  ${CYAN}Manage with:${RESET} sudo systemctl {start|stop|restart|status} webterm"
+  echo "  ${CYAN}Manage with:${RESET} sudo systemctl {start|stop|restart|status} webtun"
 }
 
 # ── Start & Launch ─────────────────────────────────────────────
 echo ""
 echo "  ${BOLD}${GREEN}Setup complete!${RESET}"
 echo ""
-echo "  Starting WebTerm server..."
+  echo "  Starting WebTun server..."
 
 # Kill old instance if running
 pkill -f "node.*server.js" 2>/dev/null || true
@@ -242,7 +242,7 @@ done
 
 echo ""
 echo "  ┌─────────────────────────────────────────┐"
-echo "  │  ${GREEN}${BOLD}WebTerm is running!${RESET}                       │"
+  echo "  │  ${GREEN}${BOLD}WebTun is running!${RESET}                        │"
 echo "  │                                         │"
 echo "  │  Local:  ${CYAN}http://localhost:$PORT${RESET}           │"
 echo "  │  Network: ${CYAN}http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo "YOUR_IP"):$PORT${RESET}          │"
@@ -253,7 +253,7 @@ echo "  └───────────────────────
 echo ""
 
 # Systemd offer
-if [[ "$OS" == "Linux" ]] && command -v systemctl &>/dev/null && [ ! -f "/etc/systemd/system/webterm.service" ]; then
+if [[ "$OS" == "Linux" ]] && command -v systemctl &>/dev/null && [ ! -f "/etc/systemd/system/webtun.service" ]; then
   setup_systemd
 fi
 
@@ -276,7 +276,7 @@ if command -v cloudflared &>/dev/null; then
         echo "  │  ${GREEN}${BOLD}Public URL (share this!):${RESET}   │"
         echo "  │  ${CYAN}${BOLD}$URL${RESET}                         │"
         echo "  │                                                     │"
-        echo "  │  Bookmark it on your phone to use WebTerm anywhere! │"
+        echo "  │  Bookmark it on your phone to use WebTun anywhere!  │"
         echo "  └─────────────────────────────────────────────────────┘"
         echo ""
       fi

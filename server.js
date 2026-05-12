@@ -398,7 +398,7 @@ app.get('/api/exec/stream', checkPin, (req, res) => {
 // ─────────────────────────────────────────────────────────────────────
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n  WebTerm running → http://localhost:${PORT}\n`);
+  console.log(`\n  WebTun running → http://localhost:${PORT}\n`);
   if (PIN) console.log(`  PIN protection enabled\n`);
 });
 

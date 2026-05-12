@@ -1,7 +1,7 @@
 {
-  "name": "webterm",
+  "name": "webtun",
   "version": "1.0.0",
-  "description": "Web-based terminal with file explorer",
+  "description": "Self-hosted web terminal with Cloudflare Tunnel, file explorer, and PWA support",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

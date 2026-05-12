@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Stop WebTerm server
+# Stop WebTun server
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/webterm.pid"
 
 if [ -f "$PID_FILE" ]; then
   PID=$(cat "$PID_FILE")
   if kill "$PID" 2>/dev/null; then
-    echo "✓ WebTerm stopped (PID $PID)"
+    echo "✓ WebTun stopped (PID $PID)"
     rm -f "$PID_FILE"
   else
     echo "⚠ Process $PID not running"

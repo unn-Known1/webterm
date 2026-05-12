@@ -1,12 +1,12 @@
-# WebTerm
+# WebTun — Self-Hosted Web Terminal + Cloudflare Tunnel
 
-A self-hosted web terminal with file explorer. Access your machine from any browser, including your phone.
+**Access your server's shell, files, and code editor from any browser — phone, tablet, or desktop.** WebTun combines a full-featured web terminal with a built-in file explorer and one-command Cloudflare Tunnel setup for secure remote access without port forwarding.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/unn-known1/webterm.git
-cd webterm
+git clone https://github.com/unn-known1/webtun.git
+cd webtun
 chmod +x setup.sh stop.sh
 ./setup.sh
 ```
@@ -14,14 +14,14 @@ chmod +x setup.sh stop.sh
 ## One-liner — auto-launch with Cloudflare Tunnel
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/unn-known1/webterm/main/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/unn-known1/webtun/main/setup.sh | bash
 ```
 
 Or clone + tunnel in one shot:
 
 ```bash
-git clone https://github.com/unn-known1/webterm.git \
-  && cd webterm \
+git clone https://github.com/unn-known1/webtun.git \
+  && cd webtun \
   && npm install \
   && node server.js & \
   && cloudflared tunnel --url http://localhost:3000
@@ -74,8 +74,8 @@ PIN=yourpin
 ## Manual Start
 
 ```bash
-git clone https://github.com/unn-knonw1/webterm.git
-cd webterm
+git clone https://github.com/unn-known1/webtun.git
+cd webtun
 npm install
 
 # Start server
