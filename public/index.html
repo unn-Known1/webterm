@@ -770,9 +770,11 @@ async function unlockApp() {
 async function api(url, opts = {}) {
   opts.headers = opts.headers || {};
   opts.headers['x-pin-token'] = authToken;
-  const r = await fetch(url, opts);
-  if (!r.ok && r.status === 401) { showPinScreen(); return {}; }
-  try { return await r.json(); } catch { return {}; }
+  try {
+    const r = await fetch(url, opts);
+    if (!r.ok && r.status === 401) { showPinScreen(); return {}; }
+    try { return await r.json(); } catch { return {}; }
+  } catch { return {}; }
 }
 
 // ═══════════════════════════════════════════════════════
