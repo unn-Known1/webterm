@@ -544,7 +544,7 @@ svg { display: block; }
       <h3>Terminal</h3>
       <div class="setting-row">
         <label>Scrollback Lines</label>
-        <input type="number" id="s-scrollback" min="100" max="100000" value="5000" onchange="saveSetting('scrollback', +this.value)">
+        <input type="number" id="s-scrollback" min="100" max="100000" value="5000" onchange="applyScrollback(+this.value)">
       </div>
       <div class="setting-row">
         <label>Bell Sound</label>
@@ -1302,6 +1302,7 @@ async function openFileEditor(path) {
 }
 
 async function saveFile() {
+  if (!editorPath) { toast('No file open', 'error'); return; }
   const content = document.getElementById('editor-textarea').value;
   const r = await api('/api/files/write', {
     method: 'POST',
@@ -1371,6 +1372,8 @@ function loadSettings() {
   document.getElementById('s-theme').value = settings.theme;
   document.getElementById('s-fontsize').value = settings.fontSize;
   document.getElementById('s-scrollback').value = settings.scrollback;
+  document.getElementById('s-font').value = settings.font;
+  document.getElementById('s-cursor').value = settings.cursor;
   syncToggle('blink'); syncToggle('bell'); syncToggle('mobilekeys'); syncToggle('confirmclose');
 }
 
@@ -1461,6 +1464,12 @@ function applyTheme(theme, save = true) {
 function applyFontSize(size) {
   settings.fontSize = size;
   tabs.forEach(t => { if (t.term) { t.term.options.fontSize = size; t.fitAddon?.fit(); } });
+  saveSettings();
+}
+
+function applyScrollback(lines) {
+  settings.scrollback = lines;
+  tabs.forEach(t => { if (t.term) t.term.options.scrollback = lines; });
   saveSettings();
 }
 

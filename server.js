@@ -151,6 +151,7 @@ app.get('/api/files/download', checkPin, (req, res) => {
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename="${path.basename(p)}.zip"`);
       const archive = archiver('zip', { zlib: { level: 6 } });
+      archive.on('error', err => { res.status(500).json({ error: err.message }); });
       archive.pipe(res);
       archive.directory(p, path.basename(p));
       archive.finalize();
@@ -335,7 +336,8 @@ app.post('/api/exec', checkPin, (req, res) => {
   let stdout = '', stderr = '';
   const start = Date.now();
 
-  const proc = spawn('/bin/bash', ['-c', command], {
+  const execShell = process.env.SHELL || (fs.existsSync('/bin/bash') ? '/bin/bash' : 'sh');
+  const proc = spawn(execShell, ['-c', command], {
     cwd: execCwd,
     env: { ...process.env },
     stdio: ['ignore', 'pipe', 'pipe']
@@ -379,7 +381,8 @@ app.get('/api/exec/stream', checkPin, (req, res) => {
     if (!res.writableEnded) res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
   };
 
-  const proc = spawn('/bin/bash', ['-c', command], {
+  const execShell = process.env.SHELL || (fs.existsSync('/bin/bash') ? '/bin/bash' : 'sh');
+  const proc = spawn(execShell, ['-c', command], {
     cwd: reqCwd || os.homedir(),
     env: { ...process.env },
     stdio: ['ignore', 'pipe', 'pipe']
@@ -397,33 +400,36 @@ app.get('/api/exec/stream', checkPin, (req, res) => {
 
 // ── File search (fuzzy finder) ──────────────────────────────────────
 app.get('/api/search', checkPin, (req, res) => {
-  const q = (req.query.q || '').trim();
+  const q = (req.query.q || '').trim().toLowerCase();
   const dir = req.query.path || os.homedir();
   if (!q || q.length < 1) return res.json({ results: [] });
 
   const maxResults = 50;
   const results = [];
+  const maxDepth = 4;
 
-  try {
-    const { execFileSync } = require('child_process');
-    const out = execFileSync('find', [dir, '-maxdepth', '4', '(', '-type', 'f', '-o', '-type', 'd', ')', '-iname', `*${q}*`], {
-      encoding: 'utf8', timeout: 5000, maxBuffer: 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    const lines = out.trim().split('\n').filter(Boolean);
-    for (const line of lines) {
+  function walk(currentDir, depth) {
+    if (depth > maxDepth || results.length >= maxResults) return;
+    let entries;
+    try { entries = fs.readdirSync(currentDir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
       if (results.length >= maxResults) break;
-      try {
-        const st = fs.statSync(line);
-        results.push({
-          path: line,
-          name: path.basename(line),
-          isDir: st.isDirectory(),
-          dir: path.dirname(line)
-        });
-      } catch {}
+      const full = path.join(currentDir, e.name);
+      if (e.name.toLowerCase().includes(q)) {
+        try {
+          const st = fs.statSync(full);
+          results.push({
+            path: full, name: e.name,
+            isDir: e.isDirectory(),
+            dir: currentDir
+          });
+        } catch {}
+      }
+      if (e.isDirectory()) walk(full, depth + 1);
     }
-  } catch {}
+  }
+
+  try { walk(dir, 0); } catch {}
 
   res.json({ results });
 });
