@@ -57,6 +57,7 @@ cloudflared tunnel run webtun
 - Run CLI tools on the go from your phone
 - Give someone terminal access without SSH keys
 - Emergency server access without a laptop
+- **Colab power-up** — run WebTun in a Google Colab notebook cell (`npm start`) and open the tunnel URL in a separate tab for a persistent, multi-window terminal alongside your Python notebooks
 
 ## ⭐ If this helped you, star the repo!
 
