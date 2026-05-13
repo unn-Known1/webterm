@@ -19,12 +19,12 @@ Access your Linux server from **any browser, phone, or tablet** — no VPN, no S
 
 ### One-command install
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/unn-known1/webtun/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/unn-Known1/webtun/main/install.sh)"
 ```
 
 ### Manual setup
 ```bash
-git clone https://github.com/unn-known1/webtun.git
+git clone https://github.com/unn-Known1/webtun.git
 cd webtun
 chmod +x setup.sh && ./setup.sh
 ```

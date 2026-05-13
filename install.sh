@@ -2,7 +2,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-REPO="https://github.com/unn-known1/webtun.git"
+REPO="https://github.com/unn-Known1/webtun.git"
 DIR="$HOME/webtun"
 
 echo ""
