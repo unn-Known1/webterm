@@ -570,6 +570,7 @@ svg { display: block; }
 <div class="overlay" id="sys-overlay">
   <div class="modal">
     <h2>🖥 System Stats</h2>
+    <div id="sys-loading" style="text-align:center;padding:20px;color:var(--fg2);display:none">Loading…</div>
     <div id="sys-content">
       <div class="sys-grid">
         <div class="sys-card">
@@ -1539,13 +1540,15 @@ function finderKeydown(e) {
 // ═══════════════════════════════════════════════════════
 function openSystemStats() {
   openOverlay('sys-overlay');
-  document.getElementById('sys-content').innerHTML = '<div style="text-align:center;padding:20px;color:var(--fg2)">Loading…</div>';
+  document.getElementById('sys-loading').style.display = 'block';
   refreshSystemStats();
 }
 
 async function refreshSystemStats() {
+  document.getElementById('sys-loading').style.display = 'block';
   const data = await api('/api/system');
-  if (!data || !data.cpu) { document.getElementById('sys-content').innerHTML = '<div style="text-align:center;padding:20px;color:var(--red)">Failed to load system stats</div>'; return; }
+  document.getElementById('sys-loading').style.display = 'none';
+  if (!data || !data.cpu) { toast('Failed to load system stats', 'error'); return; }
 
   const fmt = (bytes) => { if (bytes < 1024) return bytes + ' B'; if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'; if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB'; return (bytes / 1073741824).toFixed(1) + ' GB'; };
   const fmtUptime = (s) => { const d = Math.floor(s / 86400); const h = Math.floor((s % 86400) / 3600); const m = Math.floor((s % 3600) / 60); return `${d}d ${h}h ${m}m`; };
