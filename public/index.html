@@ -74,7 +74,7 @@
    RESET & BASE
    ═══════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 13px; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 13px; padding-bottom: env(safe-area-inset-bottom); scroll-behavior: smooth; touch-action: manipulation; -webkit-overflow-scrolling: touch; }
 
 button { background: none; border: none; cursor: pointer; color: inherit; font-family: inherit; }
 input, select, textarea { font-family: var(--font); background: var(--bg3); border: 1px solid var(--border); color: var(--fg); border-radius: var(--radius); padding: 6px 10px; outline: none; font-size: 13px; }
@@ -83,21 +83,24 @@ a { color: var(--accent); text-decoration: none; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg2); }
+/* Always show scrollbars for better UX */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 svg { display: block; }
 
 /* ═══════════════════════════════════════════════════════
    LAYOUT
    ═══════════════════════════════════════════════════════ */
-#app { display: flex; flex-direction: column; height: 100%; }
+#app { display: flex; flex-direction: column; height: 100dvh; }
 #header { display: flex; align-items: center; height: var(--header-h); background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 8px; gap: 6px; flex-shrink: 0; z-index: 10; }
-#main { display: flex; flex: 1; overflow: hidden; }
+#main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 #sidebar { width: var(--sidebar-w); background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; transition: width 0.2s, transform 0.2s; }
 #sidebar.hidden { width: 0; }
-#content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+#content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; min-height: 0; }
 #tab-bar { display: flex; align-items: center; height: var(--tab-h); background: var(--bg2); border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; flex-shrink: 0; gap: 2px; padding: 0 4px; }
 #tab-bar::-webkit-scrollbar { height: 3px; }
 #terminals { flex: 1; position: relative; overflow: hidden; }
-.term-wrapper { position: absolute; inset: 0; padding: 4px; display: none; }
+.term-wrapper { position: absolute; inset: 0; padding: 4px; display: none; touch-action: none; -webkit-overflow-scrolling: touch; }
 .term-wrapper.active { display: flex; }
 .xterm { flex: 1; }
 .xterm-viewport { border-radius: 0; }
@@ -109,7 +112,7 @@ svg { display: block; }
 .term-tile-header .tth-close { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 3px; opacity: 0.4; font-size: 12px; line-height: 1; }
 .term-tile-header .tth-close:hover { opacity: 1; background: var(--border); }
 #terminals.tiles-mode .xterm { flex: 1; }
-#mobile-keys { display: none; height: var(--mobilekey-h); background: var(--bg3); border-top: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: 4px 6px; gap: 4px; }
+#mobile-keys { display: none; height: var(--mobilekey-h); background: var(--bg3); border-top: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: 4px 6px; gap: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom)); min-height: calc(var(--mobilekey-h) + env(safe-area-inset-bottom)); }
 #editor-view { position: absolute; inset: 0; background: var(--bg); display: none; flex-direction: column; z-index: 5; }
 #editor-view.open { display: flex; }
 
@@ -139,7 +142,7 @@ svg { display: block; }
    ═══════════════════════════════════════════════════════ */
 #sidebar-header { display: flex; align-items: center; padding: 8px 10px; gap: 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 #sidebar-header input { flex: 1; height: 26px; font-size: 12px; }
-#file-list-wrap { flex: 1; overflow-y: auto; }
+#file-list-wrap { flex: 1; overflow-y: auto; min-height: 0; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 #file-breadcrumb { padding: 4px 10px; font-size: 11px; color: var(--fg2); border-bottom: 1px solid var(--border); word-break: break-all; line-height: 1.4; flex-shrink: 0; }
 .file-item { display: flex; align-items: center; gap: 8px; padding: 5px 10px; cursor: pointer; border-bottom: 1px solid transparent; font-size: 12px; position: relative; user-select: none; }
 .file-item:hover { background: var(--bg3); }
@@ -240,7 +243,7 @@ svg { display: block; }
 /* ═══════════════════════════════════════════════════════
    TOAST
    ═══════════════════════════════════════════════════════ */
-#toast-container { position: fixed; bottom: 60px; right: 16px; z-index: 400; display: flex; flex-direction: column; gap: 8px; }
+#toast-container { position: fixed; bottom: calc(60px + env(safe-area-inset-bottom)); right: 16px; z-index: 400; display: flex; flex-direction: column; gap: 8px; }
 .toast { padding: 10px 16px; background: var(--bg4); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; color: var(--fg); box-shadow: 0 4px 16px rgba(0,0,0,0.4); animation: slideIn 0.2s ease; max-width: 280px; }
 .toast.success { border-left: 3px solid var(--green); }
 .toast.error { border-left: 3px solid var(--red); }
@@ -700,6 +703,7 @@ let homeDir = '';
 let ctxTarget = null;
 let renamePath = '';
 let editorPath = '';
+let editorOriginalContent = '';
 let hasTmux = false;
 let settings = {
   theme: 'tokyonight', fontSize: 14, font: "'SF Mono', 'Fira Code', Consolas, monospace",
@@ -781,8 +785,13 @@ async function unlockApp() {
   // Restore tabs from last session, or open a fresh one
   const saved = loadTabState();
   if (hasTmux && saved.length > 0) {
-    // Restore each saved tab (re-attaches to its tmux session)
-    for (const s of saved) newTab(s.title, s.sessionId);
+    // Restore each saved tab sequentially to avoid race conditions
+    (async () => {
+      for (const s of saved) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        newTab(s.title, s.sessionId);
+      }
+    })();
   } else {
     newTab();
   }
@@ -875,6 +884,13 @@ function activateTab(id) {
 function closeTab(e, id) {
   e.stopPropagation();
   if (settings.confirmclose && tabs.length === 1) { if (!confirm('Close last terminal?')) return; }
+
+  // Check for unsaved editor changes
+  const editorOpen = document.getElementById('editor-view').classList.contains('open');
+  if (editorOpen && document.getElementById('editor-textarea').value !== editorOriginalContent) {
+    if (!confirm('You have unsaved changes. Close anyway?')) return;
+  }
+
   const tab = tabs.find(t => t.id === id);
   if (!tab) return;
   tab.closed = true;
@@ -894,6 +910,7 @@ function closeTab(e, id) {
 
 function reconnectTab(tab) {
   if (tab.closed || !tab.term) return;
+  clearTimeout(tab.reconnectTimer); // Prevent multiple timers
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const cols = tab.term.cols, rows = tab.term.rows;
   const sessionParam = tab.sessionId ? `&session=${encodeURIComponent(tab.sessionId)}` : '';
@@ -925,6 +942,12 @@ function initTerminal(tab) {
     windowsMode: false,
     convertEol: false,
     bellStyle: settings.bell ? 'sound' : 'none',
+    smoothScrollDuration: 100,
+    selectionTheme: {
+      extension: true,
+      foreground: '#1a1b26',
+      background: '#7aa2f744'
+    }
   };
 
   const term = new Terminal(cfg);
@@ -1015,6 +1038,14 @@ function initTerminal(tab) {
     if (activeTabId === tab.id) { try { fitAddon.fit(); } catch {} }
   });
   ro.observe(tab.wrapper);
+
+  // Ensure wheel events scroll the terminal even when mouse events are captured by apps
+  tab.wrapper.addEventListener('wheel', e => {
+    if (e.ctrlKey || e.metaKey) return; // Let pinch-zoom work
+    e.preventDefault();
+    if (e.deltaY < 0) term.scrollLines(-Math.ceil(Math.abs(e.deltaY) / 50));
+    else if (e.deltaY > 0) term.scrollLines(Math.ceil(e.deltaY / 50));
+  }, { passive: false });
 }
 
 function getActiveTab() { return tabs.find(t => t.id === activeTabId); }
@@ -1074,7 +1105,7 @@ function layoutTiles() {
 // XTERM THEME
 // ═══════════════════════════════════════════════════════
 function getXtermTheme() {
-  const s = getComputedStyle(document.body);
+  const s = getComputedStyle(document.documentElement);
   const g = v => s.getPropertyValue(v).trim();
   return {
     background: g('--bg'), foreground: g('--fg'), cursor: g('--accent'),
@@ -1282,6 +1313,7 @@ async function openFileEditor(path) {
   const r = await api(`/api/files/read?path=${encodeURIComponent(path)}`);
   if (r.error) { toast(r.error, 'error'); return; }
   editorPath = path;
+  editorOriginalContent = r.content;
   document.getElementById('editor-filename').textContent = path.split('/').pop() + '  ' + path;
   document.getElementById('editor-textarea').value = r.content;
   document.getElementById('editor-status').textContent = '';
@@ -1305,7 +1337,13 @@ async function saveFile() {
 }
 
 function closeEditor() {
+  const currentContent = document.getElementById('editor-textarea').value;
+  if (currentContent !== editorOriginalContent) {
+    if (!confirm('You have unsaved changes. Close anyway?')) return;
+  }
   document.getElementById('editor-view').classList.remove('open');
+  editorPath = '';
+  editorOriginalContent = '';
   const tab = getActiveTab();
   setTimeout(() => { try { tab?.fitAddon?.fit(); tab?.term?.focus(); } catch {} }, 60);
 }
@@ -1738,7 +1776,9 @@ async function refreshSystemStats() {
 // ═══════════════════════════════════════════════════════
 function registerSW() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => toast('App installed for offline use', 'success'))
+      .catch(err => console.warn('SW registration failed:', err));
   }
 }
 
@@ -1746,6 +1786,15 @@ function registerSW() {
 // START
 // ═══════════════════════════════════════════════════════
 init();
+
+// Warn before closing if there are unsaved changes
+window.addEventListener('beforeunload', e => {
+  const editorOpen = document.getElementById('editor-view').classList.contains('open');
+  if (editorOpen && document.getElementById('editor-textarea').value !== editorOriginalContent) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 </script>
 </body>
 </html>

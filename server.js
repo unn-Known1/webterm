@@ -22,6 +22,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Trust proxy for proper IP detection behind reverse proxy
+app.set('trust proxy', 1);
+
 // ── Auth ──────────────────────────────────────────────────────────────
 function checkPin(req, res, next) {
   if (!PIN) return next();
@@ -51,6 +54,40 @@ app.get('/api/home', checkPin, (req, res) => {
 // ── File API ──────────────────────────────────────────────────────────
 function safeStat(p) {
   try { return fs.statSync(p); } catch { return null; }
+}
+
+function isDescendantOf(dir, child, maxDepth = 10) {
+  const absDir = path.resolve(dir);
+  const absChild = path.resolve(child);
+  const rel = path.relative(absDir, absChild);
+  // Must not go up directories, and respect depth
+  if (rel.startsWith('..')) return false;
+  const depth = rel.split(path.sep).filter(Boolean).length;
+  return depth <= maxDepth;
+}
+
+function safeWalk(currentDir, depth, maxDepth, q, results, maxResults) {
+  if (depth > maxDepth || results.length >= maxResults) return;
+  let entries;
+  try { entries = fs.readdirSync(currentDir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    if (results.length >= maxResults) break;
+    const full = path.join(currentDir, e.name);
+    if (e.name.toLowerCase().includes(q)) {
+      try {
+        const st = fs.statSync(full);
+        results.push({ path: full, name: e.name, isDir: st.isDirectory(), dir: currentDir });
+      } catch {}
+    }
+    if (e.isDirectory()) {
+      // Prevent symlink loops
+      try {
+        const st = fs.lstatSync(full);
+        if (st.isSymbolicLink()) continue;
+      } catch {}
+      safeWalk(full, depth + 1, maxDepth, q, results, maxResults);
+    }
+  }
 }
 
 app.get('/api/files', checkPin, (req, res) => {
@@ -176,7 +213,7 @@ app.post('/api/files/upload', checkPin, (req, res) => {
   const upload = multer({ storage }).array('files');
   upload(req, res, err => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true, count: req.files.length });
+    res.json({ success: true, count: Array.isArray(req.files) ? req.files.length : 0 });
   });
 });
 
@@ -185,6 +222,52 @@ app.post('/api/files/upload', checkPin, (req, res) => {
 const { execSync, execFileSync, spawn } = require('child_process');
 
 const TMUX = (() => { try { return execSync('command -v tmux', { stdio: ['ignore','pipe','ignore'] }).toString().trim(); } catch { return null; } })();
+
+// Simple in-memory rate limiter
+const rateLimiter = (() => {
+  const windows = new Map(); // key -> { count, resetAt }
+  const LIMITS = {
+    '/api/exec': { limit: 10, windowMs: 10000 },
+    '/api/search': { limit: 20, windowMs: 10000 },
+  };
+  return (req, res, next) => {
+    // Only rate limit POST /api/exec and GET /api/search
+    const path = req.path;
+    const cfg = path === '/api/exec' ? LIMITS['/api/exec'] : path === '/api/search' ? LIMITS['/api/search'] : null;
+    if (!cfg) return next();
+    const now = Date.now();
+    const key = req.ip || 'default';
+    let win = windows.get(key);
+    if (!win || now > win.resetAt) {
+      win = { count: 0, resetAt: now + cfg.windowMs };
+      windows.set(key, win);
+    }
+    win.count++;
+    if (win.count > cfg.limit) {
+      return res.status(429).json({ error: 'Too many requests, please wait' });
+    }
+    next();
+  };
+})();
+
+// Clean up dead tmux sessions from previous runs on startup
+function cleanupOrphanTmuxSessions() {
+  if (!TMUX) return;
+  try {
+    const out = execFileSync(TMUX, ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }).trim();
+    const sessions = out.split('\n').filter(s => s.startsWith('wt-'));
+    for (const s of sessions) {
+      try {
+        // Check if this session has a connected client
+        const clients = execFileSync(TMUX, ['list-clients', '-t', s], { stdio: 'pipe', encoding: 'utf8' }).trim();
+        if (!clients) {
+          // No clients attached, kill orphaned session
+          execFileSync(TMUX, ['kill-session', '-t', s], { stdio: 'ignore' });
+        }
+      } catch { /* Session may have no clients or already be gone */ }
+    }
+  } catch { /* No sessions or tmux error */ }
+}
 
 function tmuxSessionExists(name) {
   try { execFileSync(TMUX, ['has-session', '-t', name], { stdio: 'ignore' }); return true; } catch { return false; }
@@ -235,9 +318,13 @@ wss.on('connection', (ws, req) => {
 
   const send = (type, payload) => {
     if (ws.readyState !== WebSocket.OPEN) return;
-    const buf = Buffer.isBuffer(payload)
-      ? Buffer.concat([Buffer.from([type]), payload])
-      : Buffer.from(String.fromCharCode(type) + (payload || ''));
+    let buf;
+    if (Buffer.isBuffer(payload)) {
+      buf = Buffer.concat([Buffer.from([type]), payload]);
+    } else {
+      buf = Buffer.from([type]);
+      if (payload) buf = Buffer.concat([buf, Buffer.from(payload, 'utf8')]);
+    }
     ws.send(buf);
   };
 
@@ -328,7 +415,7 @@ wss.on('connection', (ws, req) => {
 // POST /api/exec
 // Body: { command: string, cwd?: string, timeout?: number (ms, default 60000) }
 // Response: { exitCode, stdout, stderr, duration }
-app.post('/api/exec', checkPin, (req, res) => {
+app.post('/api/exec', rateLimiter, checkPin, (req, res) => {
   const { command, cwd: reqCwd, timeout = 60000 } = req.body;
   if (!command) return res.status(400).json({ error: 'command required' });
 
@@ -399,37 +486,23 @@ app.get('/api/exec/stream', checkPin, (req, res) => {
 });
 
 // ── File search (fuzzy finder) ──────────────────────────────────────
-app.get('/api/search', checkPin, (req, res) => {
+app.get('/api/search', rateLimiter, checkPin, (req, res) => {
   const q = (req.query.q || '').trim().toLowerCase();
   const dir = req.query.path || os.homedir();
   if (!q || q.length < 1) return res.json({ results: [] });
+
+  // Validate the search directory is within allowed bounds
+  const searchDir = path.resolve(dir);
+  const home = os.homedir();
+  if (!isDescendantOf(home, searchDir, 20)) {
+    return res.status(403).json({ error: 'Search path outside home directory' });
+  }
 
   const maxResults = 50;
   const results = [];
   const maxDepth = 4;
 
-  function walk(currentDir, depth) {
-    if (depth > maxDepth || results.length >= maxResults) return;
-    let entries;
-    try { entries = fs.readdirSync(currentDir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (results.length >= maxResults) break;
-      const full = path.join(currentDir, e.name);
-      if (e.name.toLowerCase().includes(q)) {
-        try {
-          const st = fs.statSync(full);
-          results.push({
-            path: full, name: e.name,
-            isDir: e.isDirectory(),
-            dir: currentDir
-          });
-        } catch {}
-      }
-      if (e.isDirectory()) walk(full, depth + 1);
-    }
-  }
-
-  try { walk(dir, 0); } catch {}
+  try { safeWalk(searchDir, 0, maxDepth, q, results, maxResults); } catch {}
 
   res.json({ results });
 });
@@ -607,6 +680,7 @@ app.delete('/api/tunnel', checkPin, (req, res) => {
 // ─────────────────────────────────────────────────────────────────────
 
 loadTunnels();
+cleanupOrphanTmuxSessions();
 
 server.listen(PORT, HOST, () => {
   console.log(`\n  WebTun running → http://localhost:${PORT}\n`);
@@ -615,3 +689,28 @@ server.listen(PORT, HOST, () => {
 
 process.on('uncaughtException', e => console.error('Uncaught:', e.message));
 process.on('unhandledRejection', e => console.error('Unhandled:', e));
+
+// Cleanup spawned processes on exit
+function cleanup() {
+  // Kill cloudflared tunnels
+  for (const [id, entry] of tunnels) {
+    try {
+      if (entry.proc) entry.proc.kill('SIGTERM');
+      else if (entry.pid) process.kill(entry.pid, 'SIGTERM');
+    } catch {}
+  }
+  // Kill tmux sessions managed by this server
+  if (TMUX) {
+    try {
+      const out = execFileSync(TMUX, ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }).trim();
+      const sessions = out.split('\n').filter(s => s.startsWith('wt-'));
+      for (const s of sessions) {
+        try { execFileSync(TMUX, ['kill-session', '-t', s], { stdio: 'ignore' }); } catch {}
+      }
+    } catch {}
+  }
+}
+
+process.on('SIGTERM', cleanup);
+process.on('SIGINT', cleanup);
+process.on('exit', cleanup);
