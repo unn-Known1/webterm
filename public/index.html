@@ -886,7 +886,7 @@ function activateTab(id) {
 
 function closeTab(e, id) {
   e.stopPropagation();
-  if (tabs.length === 1) { if (!confirm('Close last terminal?')) return; }
+  if (settings.confirmclose && tabs.length === 1) { if (!confirm('Close last terminal?')) return; }
   const tab = tabs.find(t => t.id === id);
   if (!tab) return;
   tab.closed = true;
@@ -1388,8 +1388,7 @@ function toggleSetting(k) {
   syncToggle(k);
   saveSettings();
   if (k === 'mobilekeys') {
-    const mk = document.getElementById('mobile-keys');
-    if (window.innerWidth <= 768) mk.style.display = settings.mobilekeys ? 'flex' : 'none';
+    document.getElementById('mobile-keys').style.display = settings.mobilekeys ? 'flex' : 'none';
   }
 }
 
@@ -1525,7 +1524,7 @@ function cycleTab(dir) {
 function setupMobileKeys() {
   const mk = document.getElementById('mobile-keys');
   if (window.innerWidth <= 768) {
-    mk.style.display = settings.mobilekeys ? 'flex' : 'flex'; // show by default on mobile
+    mk.style.display = 'flex'; // show by default on mobile
   }
 }
 

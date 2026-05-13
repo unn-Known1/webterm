@@ -78,7 +78,7 @@ WebTun has a built-in tunnel manager accessible from the **Settings** (gear icon
 2. Click **Create** — a Cloudflare Tunnel spawns automatically
 3. Copy the public URL with the copy icon, or click the **red stop square** to kill that tunnel only
 
-Tunnels are **detached** from the server — they survive restarts and keep running until you stop them or the machine reboots.
+Tunnel processes are **detached** from the server process — they keep running if the server restarts. Manage them via the Settings panel; tunnels created before a server restart won't appear in the UI (stop them via `kill $(pgrep -f 'cloudflared tunnel')`).
 
 ## ⭐ If this helped you, star the repo!
 
