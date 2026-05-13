@@ -17,17 +17,27 @@ Access your Linux server from **any browser, phone, or tablet** — no VPN, no S
 
 ## 🚀 Quick Start
 
+### One-command install
 ```bash
-# One-command install
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/unn-known1/webtun/main/install.sh)"
-
-# Or run manually
-git clone https://github.com/unn-known1/webtun.git
-cd webtun
-node server.js
 ```
 
-Then create a Cloudflare Tunnel:
+### Manual setup
+```bash
+git clone https://github.com/unn-known1/webtun.git
+cd webtun
+chmod +x setup.sh && ./setup.sh
+```
+
+### Quick launch (if already set up)
+```bash
+cd webtun
+npm start
+```
+
+The `setup.sh` script handles everything: Node.js install, npm dependencies, `.env` config, systemd service, and optional Cloudflare Tunnel setup.
+
+To expose via your own domain with Cloudflare Tunnel:
 ```bash
 cloudflared tunnel create webtun
 cloudflared tunnel route dns webtun yourdomain.com

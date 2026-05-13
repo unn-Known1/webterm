@@ -406,7 +406,7 @@ app.get('/api/search', checkPin, (req, res) => {
 
   try {
     const { execFileSync } = require('child_process');
-    const out = execFileSync('find', [dir, '-maxdepth', '4', '-iname', `*${q}*`, '-type', 'f', '-o', '-type', 'd', '-iname', `*${q}*`], {
+    const out = execFileSync('find', [dir, '-maxdepth', '4', '(', '-type', 'f', '-o', '-type', 'd', ')', '-iname', `*${q}*`], {
       encoding: 'utf8', timeout: 5000, maxBuffer: 1024 * 1024,
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -429,7 +429,7 @@ app.get('/api/search', checkPin, (req, res) => {
 });
 
 // ── System stats ────────────────────────────────────────────────────
-app.get('/api/system', checkPin, (req, res) => {
+app.get('/api/system', checkPin, async (req, res) => {
   const { execSync } = require('child_process');
   const cpus = os.cpus();
   const cpuModel = cpus.length > 0 ? cpus[0].model : 'unknown';
@@ -438,13 +438,19 @@ app.get('/api/system', checkPin, (req, res) => {
 
   let cpuUsage = 0;
   try {
-    const procStat = fs.readFileSync('/proc/stat', 'utf8');
-    const cpuLine = procStat.split('\n').find(l => l.startsWith('cpu '));
-    if (cpuLine) {
-      const parts = cpuLine.trim().split(/\s+/).slice(1).map(Number);
-      const total = parts.reduce((a, b) => a + b, 0);
-      const idle = parts[3] || 0;
-      cpuUsage = Math.round((1 - idle / total) * 100);
+    const readCpuTimes = () => {
+      const line = fs.readFileSync('/proc/stat', 'utf8').split('\n').find(l => l.startsWith('cpu '));
+      if (!line) return null;
+      const parts = line.trim().split(/\s+/).slice(1).map(Number);
+      return { total: parts.reduce((a, b) => a + b, 0), idle: parts[3] || 0 };
+    };
+    const t1 = readCpuTimes();
+    await new Promise(r => setTimeout(r, 100));
+    const t2 = readCpuTimes();
+    if (t1 && t2) {
+      const dTotal = t2.total - t1.total;
+      const dIdle  = t2.idle  - t1.idle;
+      cpuUsage = dTotal > 0 ? Math.round((1 - dIdle / dTotal) * 100) : 0;
     }
   } catch {}
 

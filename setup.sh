@@ -267,9 +267,9 @@ if command -v cloudflared &>/dev/null; then
     echo "  ${YELLOW}Your public URL will appear below (takes a few seconds):${RESET}"
     echo "  ${YELLOW}Press Ctrl+C to stop the tunnel (server keeps running).${RESET}"
     echo ""
-    # Run cloudflared and use --line-buffered to prevent grep from hiding the output
-    cloudflared tunnel --url "http://localhost:$PORT" 2>&1 | grep --line-buffered -E "https://[a-z0-9-]+\.trycloudflare\.com" | while read -r line; do
-      URL=$(echo "$line" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com')
+    # Run cloudflared; pipe stderr+stdout through grep to surface the public URL,
+    # then also let everything flow through so the user sees full output.
+    cloudflared tunnel --url "http://localhost:$PORT" 2>&1 | tee /dev/stderr | grep --line-buffered -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | while read -r URL; do
       if [ -n "$URL" ]; then
         echo ""
         echo "  ┌─────────────────────────────────────────────────────┐"
@@ -281,8 +281,6 @@ if command -v cloudflared &>/dev/null; then
         echo ""
       fi
     done
-    # Fallback: just run cloudflared and let it print naturally
-    cloudflared tunnel --url "http://localhost:$PORT"
   else
     echo ""
     echo "  ${YELLOW}To start the tunnel later, run:${RESET}"

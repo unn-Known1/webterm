@@ -781,7 +781,7 @@ async function api(url, opts = {}) {
 function newTab(title, sessionId) {
   const id = ++tabCounter;
   const sid = sessionId || (hasTmux ? uuid() : null);
-  const tab = { id, sessionId: sid, title: title || `Term ${id}`, term: null, fitAddon: null, searchAddon: null, ws: null, el: null, wrapper: null, closed: false, reconnectDelay: 1000 };
+  const tab = { id, sessionId: sid, title: title || `Term ${id}`, term: null, fitAddon: null, searchAddon: null, ws: null, el: null, wrapper: null, closed: false, reconnectDelay: 1000, dataDisposable: null, resizeDisposable: null };
   tabs.push(tab);
 
   // Tab button
@@ -880,8 +880,10 @@ function reconnectTab(tab) {
   ws.onmessage = e => { const b=new Uint8Array(e.data),t=b[0],p=b.slice(1); if(t===0) tab.term.write(p); else if(t===1) tab.term.writeln('\r\n\x1b[31m[Process exited]\x1b[0m'); else if(t===2) tab.term.writeln('\r\n\x1b[31m'+new TextDecoder().decode(p)+'\x1b[0m'); };
   ws.onerror = () => {};
   ws.onclose = () => { clearInterval(tab.pingTimer); if(tab.closed) return; tab.reconnectDelay=Math.min((tab.reconnectDelay||1000)*2,15000); tab.term.writeln(`\r\n\x1b[33m[Disconnected — reconnecting in ${tab.reconnectDelay/1000}s…]\x1b[0m`); tab.reconnectTimer=setTimeout(()=>{ if(!tab.closed) reconnectTab(tab); },tab.reconnectDelay); };
-  tab.term.onData(sendInput);
-  tab.term.onResize(({cols:c,rows:r})=>sendResize(c,r));
+  tab.dataDisposable?.dispose();
+  tab.resizeDisposable?.dispose();
+  tab.dataDisposable = tab.term.onData(sendInput);
+  tab.resizeDisposable = tab.term.onResize(({cols:c,rows:r})=>sendResize(c,r));
 }
 
 function initTerminal(tab) {
@@ -970,8 +972,10 @@ function initTerminal(tab) {
     tab.reconnectTimer = setTimeout(() => { if (!tab.closed) reconnectTab(tab); }, tab.reconnectDelay);
   };
 
-  term.onData(data => sendInput(data));
-  term.onResize(({ cols, rows }) => sendResize(cols, rows));
+  tab.dataDisposable?.dispose();
+  tab.resizeDisposable?.dispose();
+  tab.dataDisposable = term.onData(data => sendInput(data));
+  tab.resizeDisposable = term.onResize(({ cols, rows }) => sendResize(cols, rows));
 
   // Title updates from OSC
   term.onTitleChange(title => {
