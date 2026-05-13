@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1a1b26">
+<meta name="theme-color" content="#eeeef2">
 <title>WebTun — Self-Hosted Web Terminal</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
@@ -330,7 +330,7 @@ svg { display: block; }
 }
 </style>
 </head>
-<body data-theme="tokyonight">
+<body data-theme="light">
 
 <!-- PIN Screen -->
 <div id="pin-screen">
@@ -569,20 +569,7 @@ svg { display: block; }
         <input type="text" id="tunnel-url" value="http://localhost:3000" placeholder="http://localhost:PORT">
         <button class="btn btn-primary" style="height:28px;padding:0 12px;font-size:12px" onclick="createTunnel()">Create</button>
       </div>
-      <div id="tunnel-result" style="display:none">
-        <div class="setting-row">
-          <label>Public URL</label>
-          <div style="display:flex;align-items:center;gap:6px;flex:1">
-            <input type="text" id="tunnel-url-result" readonly style="flex:1;font-size:11px">
-            <button class="icon-btn" onclick="copyTunnelUrl()" title="Copy" style="flex-shrink:0;width:24px;height:24px">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-            <button class="icon-btn" onclick="stopTunnel()" title="Stop Tunnel" style="flex-shrink:0;width:24px;height:24px;color:var(--red)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
+      <div id="tunnel-list"></div>
       <div id="tunnel-status" style="font-size:11px;color:var(--fg2);min-height:16px;margin-top:2px"></div>
     </div>
     <div class="modal-actions">
@@ -715,7 +702,7 @@ let renamePath = '';
 let editorPath = '';
 let hasTmux = false;
 let settings = {
-  theme: 'light', fontSize: 14, font: "'SF Mono', 'Fira Code', Consolas, monospace",
+  theme: 'tokyonight', fontSize: 14, font: "'SF Mono', 'Fira Code', Consolas, monospace",
   cursor: 'block', blink: true, scrollback: 5000, bell: false,
   mobilekeys: false, confirmclose: true
 };
@@ -789,6 +776,7 @@ async function unlockApp() {
   setupKeyboardShortcuts();
   setupMobileKeys();
   registerSW();
+  restoreTunnels();
 
   // Restore tabs from last session, or open a fresh one
   const saved = loadTabState();
@@ -1398,56 +1386,78 @@ function toggleSetting(k) {
 function openSettings() { openOverlay('settings-overlay'); }
 function closeSettings() { closeOverlay('settings-overlay'); }
 
-let tunnelId = null;
+let tunnelList = [];
+
+async function restoreTunnels() {
+  const r = await api('/api/tunnel');
+  tunnelList = r.tunnels || [];
+  renderTunnels();
+}
+
+function renderTunnels() {
+  const list = document.getElementById('tunnel-list');
+  list.innerHTML = '';
+  if (tunnelList.length === 0) { list.style.display = 'none'; return; }
+  list.style.display = 'block';
+  tunnelList.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'setting-row';
+    row.style.marginBottom = '0';
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+        <span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.tunnelUrl}">${t.tunnelUrl}</span>
+        <span style="font-size:10px;padding:1px 6px;border-radius:4px;flex-shrink:0;background:${t.alive ? 'var(--green)' : 'var(--yellow)'};color:var(--bg)">${t.alive ? 'Live' : 'Orphan'}</span>
+        <button class="icon-btn" onclick="copyText('${t.tunnelUrl}')" title="Copy" style="width:24px;height:24px;flex-shrink:0">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button class="icon-btn" onclick="stopTunnelById('${t.id}')" title="Stop" style="width:24px;height:24px;flex-shrink:0;color:var(--red)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+        </button>
+      </div>`;
+    list.appendChild(row);
+  });
+}
 
 async function createTunnel() {
   const url = document.getElementById('tunnel-url').value.trim();
   if (!url) { toast('Enter a local URL', 'error'); return; }
-  const status = document.getElementById('tunnel-status');
-  status.textContent = 'Creating tunnel…';
-  document.getElementById('tunnel-result').style.display = 'none';
+  document.getElementById('tunnel-status').textContent = 'Creating tunnel…';
   const r = await api('/api/tunnel', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url })
   });
   if (r.success) {
-    tunnelId = r.id;
-    document.getElementById('tunnel-url-result').value = r.url;
-    document.getElementById('tunnel-result').style.display = 'block';
-    status.textContent = 'Tunnel is active';
+    tunnelList.push({ id: r.id, tunnelUrl: r.url, localUrl: url, alive: true, createdAt: Date.now() });
+    renderTunnels();
+    document.getElementById('tunnel-status').textContent = '';
     toast('Tunnel ready: ' + r.url, 'success');
   } else {
-    status.textContent = '';
+    document.getElementById('tunnel-status').textContent = '';
     toast(r.error || 'Failed to create tunnel', 'error');
   }
 }
 
-function stopTunnel() {
-  if (!tunnelId) return;
-  const status = document.getElementById('tunnel-status');
-  status.textContent = 'Stopping tunnel…';
-  api('/api/tunnel', {
+async function stopTunnelById(id) {
+  document.getElementById('tunnel-status').textContent = 'Stopping tunnel…';
+  const r = await api('/api/tunnel', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: tunnelId })
-  }).then(r => {
-    if (r.success) {
-      tunnelId = null;
-      document.getElementById('tunnel-result').style.display = 'none';
-      status.textContent = '';
-      toast('Tunnel stopped', 'info');
-    } else {
-      status.textContent = 'Tunnel is active';
-      toast(r.error || 'Failed to stop tunnel', 'error');
-    }
+    body: JSON.stringify({ id })
   });
+  if (r.success) {
+    tunnelList = tunnelList.filter(t => t.id !== id);
+    renderTunnels();
+    document.getElementById('tunnel-status').textContent = '';
+    toast('Tunnel stopped', 'info');
+  } else {
+    document.getElementById('tunnel-status').textContent = '';
+    toast(r.error || 'Failed to stop tunnel', 'error');
+  }
 }
 
-function copyTunnelUrl() {
-  const input = document.getElementById('tunnel-url-result');
-  input.select();
-  navigator.clipboard.writeText(input.value);
+function copyText(text) {
+  navigator.clipboard.writeText(text);
   toast('Copied', 'success');
 }
 

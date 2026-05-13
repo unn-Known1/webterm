@@ -514,6 +514,35 @@ app.get('/api/system', checkPin, async (req, res) => {
 
 // ── Cloudflared tunnel management ──────────────────────────────────
 const tunnels = new Map();
+const TUNNEL_FILE = path.join(__dirname, '.tunnels.json');
+
+function saveTunnels() {
+  const arr = Array.from(tunnels.entries()).map(([id, t]) => ({
+    id, localUrl: t.localUrl, tunnelUrl: t.tunnelUrl, createdAt: t.createdAt, pid: t.pid
+  }));
+  try { fs.writeFileSync(TUNNEL_FILE, JSON.stringify(arr, null, 2)); } catch {}
+}
+
+function loadTunnels() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(TUNNEL_FILE, 'utf8'));
+    for (const t of arr) {
+      try {
+        process.kill(t.pid, 0);
+        tunnels.set(t.id, { proc: null, localUrl: t.localUrl, tunnelUrl: t.tunnelUrl, createdAt: t.createdAt, pid: t.pid });
+      } catch {}
+    }
+  } catch {}
+}
+
+app.get('/api/tunnel', checkPin, (req, res) => {
+  const list = Array.from(tunnels.entries()).map(([id, t]) => {
+    let alive = t.proc !== null;
+    if (!alive && t.pid) { try { process.kill(t.pid, 0); alive = true; } catch {} }
+    return { id, localUrl: t.localUrl, tunnelUrl: t.tunnelUrl, createdAt: t.createdAt, alive };
+  });
+  res.json({ tunnels: list });
+});
 
 app.post('/api/tunnel', checkPin, async (req, res) => {
   const { url } = req.body;
@@ -553,7 +582,8 @@ app.post('/api/tunnel', checkPin, async (req, res) => {
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout))
     ]);
     const id = tunnelUrl.replace(/^https:\/\//, '').replace(/\.trycloudflare\.com$/, '');
-    tunnels.set(id, { proc, localUrl: url, tunnelUrl, createdAt: Date.now() });
+    tunnels.set(id, { proc, pid: proc.pid, localUrl: url, tunnelUrl, createdAt: Date.now() });
+    saveTunnels();
     res.json({ success: true, id, url: tunnelUrl });
   } catch (e) {
     try { proc.kill(); } catch {}
@@ -565,12 +595,18 @@ app.delete('/api/tunnel', checkPin, (req, res) => {
   const { id } = req.body;
   if (!id || !tunnels.has(id)) return res.status(404).json({ error: 'tunnel not found' });
   const entry = tunnels.get(id);
-  try { entry.proc.kill('SIGTERM'); } catch {}
+  try {
+    if (entry.proc) entry.proc.kill('SIGTERM');
+    else process.kill(entry.pid, 'SIGTERM');
+  } catch {}
   tunnels.delete(id);
+  saveTunnels();
   res.json({ success: true });
 });
 
 // ─────────────────────────────────────────────────────────────────────
+
+loadTunnels();
 
 server.listen(PORT, HOST, () => {
   console.log(`\n  WebTun running → http://localhost:${PORT}\n`);
