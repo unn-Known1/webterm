@@ -50,7 +50,7 @@ cloudflared tunnel run webtun
 Run this in a **Google Colab notebook cell** to get a full terminal with a tunnel URL:
 
 ```bash
-!git clone https://github.com/unn-Known1/webtun.git && cd webtun && npm install --loglevel=error && node server.js > /tmp/webtun.log 2>&1 & sleep 3 && curl -s -X POST http://localhost:3000/api/tunnel -H 'Content-Type: application/json' -d '{"url":"http://localhost:3000"}' --max-time 20 | python3 -c "import sys,json; d=json.load(sys.stdin); print('🌐 WebTun ready at:', d.get('url','Error: '+d.get('error','')))"
+!rm -rf webtun && git clone https://github.com/unn-Known1/webtun.git && cd webtun && npm install --loglevel=error && (command -v cloudflared &>/dev/null || (curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared)) && node server.js > /tmp/webtun.log 2>&1 & sleep 4 && for i in 1 2 3; do curl -sf http://localhost:3000/api/auth/required >/dev/null && break; sleep 2; done && curl -s -X POST http://localhost:3000/api/tunnel -H 'Content-Type: application/json' -d '{"url":"http://localhost:3000"}' --max-time 20 | python3 -c "import sys,json; d=json.load(sys.stdin); print('🌐 WebTun ready at:', d.get('url','Error: '+d.get('error','')))"
 ```
 
 Opens a persistent, multi-window terminal alongside your Python notebooks. Re-run to get a fresh tunnel URL. Stop with `!kill $(lsof -ti :3000)`.
