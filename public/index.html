@@ -1533,7 +1533,7 @@ function cycleTab(dir) {
 function setupMobileKeys() {
   const mk = document.getElementById('mobile-keys');
   if (window.innerWidth <= 768) {
-    mk.style.display = 'flex'; // show by default on mobile
+    mk.style.display = settings.mobilekeys ? 'flex' : 'none';
   }
 }
 
