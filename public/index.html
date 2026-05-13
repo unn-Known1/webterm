@@ -101,6 +101,14 @@ svg { display: block; }
 .term-wrapper.active { display: flex; }
 .xterm { flex: 1; }
 .xterm-viewport { border-radius: 0; }
+#terminals.tiles-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); grid-auto-rows: 1fr; gap: 4px; padding: 4px; position: relative; overflow: auto; }
+#terminals.tiles-mode .term-wrapper { position: relative; inset: unset; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; min-height: 150px; }
+#terminals.tiles-mode .term-wrapper.active { border-color: var(--accent); }
+.term-tile-header { display: flex; align-items: center; height: 24px; padding: 0 8px; background: var(--bg3); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--fg2); flex-shrink: 0; gap: 6px; cursor: pointer; user-select: none; }
+.term-tile-header .tth-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-tile-header .tth-close { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 3px; opacity: 0.4; font-size: 12px; line-height: 1; }
+.term-tile-header .tth-close:hover { opacity: 1; background: var(--border); }
+#terminals.tiles-mode .xterm { flex: 1; }
 #mobile-keys { display: none; height: var(--mobilekey-h); background: var(--bg3); border-top: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: 4px 6px; gap: 4px; }
 #editor-view { position: absolute; inset: 0; background: var(--bg); display: none; flex-direction: column; z-index: 5; }
 #editor-view.open { display: flex; }
@@ -356,6 +364,9 @@ svg { display: block; }
     <button class="icon-btn" title="System Stats" onclick="openSystemStats()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
     </button>
+    <button class="icon-btn" id="tilesBtn" title="Tiles Mode" onclick="toggleTiles()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    </button>
     <button class="icon-btn" title="Settings" onclick="openSettings()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
@@ -551,6 +562,29 @@ svg { display: block; }
         <div class="toggle on" id="s-confirmclose" onclick="toggleSetting('confirmclose')"></div>
       </div>
     </div>
+    <div class="settings-section">
+      <h3>Tunnel</h3>
+      <div class="setting-row">
+        <label>Local URL</label>
+        <input type="text" id="tunnel-url" value="http://localhost:3000" placeholder="http://localhost:PORT">
+        <button class="btn btn-primary" style="height:28px;padding:0 12px;font-size:12px" onclick="createTunnel()">Create</button>
+      </div>
+      <div id="tunnel-result" style="display:none">
+        <div class="setting-row">
+          <label>Public URL</label>
+          <div style="display:flex;align-items:center;gap:6px;flex:1">
+            <input type="text" id="tunnel-url-result" readonly style="flex:1;font-size:11px">
+            <button class="icon-btn" onclick="copyTunnelUrl()" title="Copy" style="flex-shrink:0;width:24px;height:24px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button class="icon-btn" onclick="stopTunnel()" title="Stop Tunnel" style="flex-shrink:0;width:24px;height:24px;color:var(--red)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="tunnel-status" style="font-size:11px;color:var(--fg2);min-height:16px;margin-top:2px"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeSettings()">Close</button>
     </div>
@@ -672,6 +706,7 @@ svg { display: block; }
 let authToken = '';
 let tabs = [];
 let activeTabId = null;
+let tilesMode = false;
 let tabCounter = 0;
 let currentPath = '';
 let homeDir = '';
@@ -680,7 +715,7 @@ let renamePath = '';
 let editorPath = '';
 let hasTmux = false;
 let settings = {
-  theme: 'tokyonight', fontSize: 14, font: "'SF Mono', 'Fira Code', Consolas, monospace",
+  theme: 'light', fontSize: 14, font: "'SF Mono', 'Fira Code', Consolas, monospace",
   cursor: 'block', blink: true, scrollback: 5000, bell: false,
   mobilekeys: false, confirmclose: true
 };
@@ -834,7 +869,7 @@ function newTab(title, sessionId) {
   tab.wrapper = wrapper;
 
   activateTab(id);
-  setTimeout(() => initTerminal(tab), 50);
+  setTimeout(() => { initTerminal(tab); if (tilesMode) layoutTiles(); }, 50);
   saveTabState();
   return tab;
 }
@@ -866,6 +901,7 @@ function closeTab(e, id) {
   tabs = tabs.filter(t => t.id !== id);
   saveTabState();
   if (activeTabId === id && tabs.length > 0) activateTab(tabs[tabs.length - 1].id);
+  if (tilesMode) layoutTiles();
 }
 
 function reconnectTab(tab) {
@@ -1004,6 +1040,46 @@ function sendKey(key) {
     tab.ws.send(buf.buffer);
   }
   tab?.term?.focus();
+}
+
+// ═══════════════════════════════════════════════════════
+// TILES MODE
+// ═══════════════════════════════════════════════════════
+function toggleTiles() {
+  tilesMode = !tilesMode;
+  document.getElementById('tilesBtn').classList.toggle('active', tilesMode);
+  document.getElementById('terminals').classList.toggle('tiles-mode', tilesMode);
+  if (tilesMode) {
+    layoutTiles();
+  } else {
+    const termWrap = document.getElementById('terminals');
+    termWrap.querySelectorAll('.term-tile-header').forEach(el => el.remove());
+    const t = getActiveTab();
+    setTimeout(() => { try { t?.fitAddon?.fit(); } catch {} }, 60);
+  }
+}
+
+function layoutTiles() {
+  const termWrap = document.getElementById('terminals');
+  termWrap.querySelectorAll('.term-tile-header').forEach(el => el.remove());
+  tabs.forEach(tab => {
+    if (!tab.wrapper) return;
+    const hdr = document.createElement('div');
+    hdr.className = 'term-tile-header';
+    hdr.innerHTML = `<span class="tth-name">${tab.title}</span><button class="tth-close" data-id="${tab.id}">×</button>`;
+    hdr.addEventListener('click', e => {
+      if (e.target.closest('.tth-close')) return;
+      activateTab(tab.id);
+    });
+    hdr.querySelector('.tth-close').addEventListener('click', e => {
+      e.stopPropagation();
+      closeTab(e, tab.id);
+    });
+    tab.wrapper.prepend(hdr);
+  });
+  setTimeout(() => {
+    tabs.forEach(tab => { try { tab.fitAddon?.fit(); } catch {} });
+  }, 60);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1319,6 +1395,59 @@ function toggleSetting(k) {
 
 function openSettings() { openOverlay('settings-overlay'); }
 function closeSettings() { closeOverlay('settings-overlay'); }
+
+let tunnelId = null;
+
+async function createTunnel() {
+  const url = document.getElementById('tunnel-url').value.trim();
+  if (!url) { toast('Enter a local URL', 'error'); return; }
+  const status = document.getElementById('tunnel-status');
+  status.textContent = 'Creating tunnel…';
+  document.getElementById('tunnel-result').style.display = 'none';
+  const r = await api('/api/tunnel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  });
+  if (r.success) {
+    tunnelId = r.id;
+    document.getElementById('tunnel-url-result').value = r.url;
+    document.getElementById('tunnel-result').style.display = 'block';
+    status.textContent = 'Tunnel is active';
+    toast('Tunnel ready: ' + r.url, 'success');
+  } else {
+    status.textContent = '';
+    toast(r.error || 'Failed to create tunnel', 'error');
+  }
+}
+
+function stopTunnel() {
+  if (!tunnelId) return;
+  const status = document.getElementById('tunnel-status');
+  status.textContent = 'Stopping tunnel…';
+  api('/api/tunnel', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: tunnelId })
+  }).then(r => {
+    if (r.success) {
+      tunnelId = null;
+      document.getElementById('tunnel-result').style.display = 'none';
+      status.textContent = '';
+      toast('Tunnel stopped', 'info');
+    } else {
+      status.textContent = 'Tunnel is active';
+      toast(r.error || 'Failed to stop tunnel', 'error');
+    }
+  });
+}
+
+function copyTunnelUrl() {
+  const input = document.getElementById('tunnel-url-result');
+  input.select();
+  navigator.clipboard.writeText(input.value);
+  toast('Copied', 'success');
+}
 
 function applyTheme(theme, save = true) {
   document.body.dataset.theme = theme;

@@ -506,6 +506,64 @@ app.get('/api/system', checkPin, async (req, res) => {
   });
 });
 
+// ── Cloudflared tunnel management ──────────────────────────────────
+const tunnels = new Map();
+
+app.post('/api/tunnel', checkPin, async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url required' });
+
+  try { require('child_process').execSync('command -v cloudflared', { stdio: 'ignore' }); }
+  catch { return res.status(500).json({ error: 'cloudflared not installed' }); }
+
+  const proc = spawn('cloudflared', ['tunnel', '--url', url], {
+    detached: true, stdio: ['ignore', 'pipe', 'pipe']
+  });
+  proc.unref();
+  let tunnelUrl = null;
+  const timeout = 15000;
+
+  const urlPromise = new Promise((resolve, reject) => {
+    const handler = data => {
+      const text = data.toString();
+      const m = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+      if (m) {
+        tunnelUrl = m[0];
+        proc.stdout.removeAllListeners('data');
+        proc.stderr.removeAllListeners('data');
+        proc.stdout.resume();
+        proc.stderr.resume();
+        resolve(tunnelUrl);
+      }
+    };
+    proc.stdout.on('data', handler);
+    proc.stderr.on('data', handler);
+    proc.on('error', err => reject(err));
+  });
+
+  try {
+    const result = await Promise.race([
+      urlPromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout))
+    ]);
+    const id = tunnelUrl.replace(/^https:\/\//, '').replace(/\.trycloudflare\.com$/, '');
+    tunnels.set(id, { proc, localUrl: url, tunnelUrl, createdAt: Date.now() });
+    res.json({ success: true, id, url: tunnelUrl });
+  } catch (e) {
+    try { proc.kill(); } catch {}
+    res.status(500).json({ error: e.message === 'timeout' ? 'Timed out waiting for tunnel URL' : e.message });
+  }
+});
+
+app.delete('/api/tunnel', checkPin, (req, res) => {
+  const { id } = req.body;
+  if (!id || !tunnels.has(id)) return res.status(404).json({ error: 'tunnel not found' });
+  const entry = tunnels.get(id);
+  try { entry.proc.kill('SIGTERM'); } catch {}
+  tunnels.delete(id);
+  res.json({ success: true });
+});
+
 // ─────────────────────────────────────────────────────────────────────
 
 server.listen(PORT, HOST, () => {
