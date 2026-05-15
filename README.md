@@ -1,85 +1,173 @@
-# 🌐 WebTun — Self-Hosted Web Terminal
+# WebTun — Self-Hosted Web Terminal
 
-Access your Linux server from **any browser, phone, or tablet** — no VPN, no SSH client needed.
+![Terminal](https://img.shields.io/badge/Terminal-Web--Native-2D5B8E?style=for-the-badge)
+![PWA](https://img.shields.io/badge/PWA-Installable-6BA428?style=for-the-badge)
+![Cloudflare](https://img.shields.io/badge/Tunnel-Cloudflare-F38020?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-![Terminal](https://img.shields.io/badge/Terminal-Web--native-blue?style=for-the-badge)
-![PWA](https://img.shields.io/badge/PWA-Installable-cyan?style=for-the-badge)
-![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-orange?style=for-the-badge)
+**Access your Linux server from any browser — no VPN, no SSH client, no installing anything.**
 
-## ✨ Features
+[![Deploy to Cloudflare](https://img.shields.io/badge/Quick_Start-One_Command-2D5B8E?style=for-the-badge&logo=gnu-bash)](install.sh)
 
-- **🖥️ Full terminal** — node-pty backed, real shell session in your browser
-- **📁 File explorer** — browse and manage files without leaving the tab
-- **🔢 Multi-tab** — open multiple shell sessions side by side
-- **📱 Mobile-friendly PWA** — install as an app on iOS/Android
-- **🔒 Self-hosted** — your server, your rules, zero third-party involvement
-- **⚡ Cloudflare Tunnel** — expose without opening ports or configuring firewalls
-- **🔗 Built-in tunnel manager** — create and stop Cloudflare Tunnels from the Settings panel (no CLI needed)
+---
 
-## 🚀 Quick Start
+## Why WebTun?
 
-### One-command install
+| Traditional SSH | WebTun |
+|----------------|--------|
+| Need SSH client installed | Open any browser |
+| Configure VPN or port forwarding | Cloudflare Tunnel auto-configured |
+| Can't access from phone easily | PWA works on iOS/Android |
+| Share access requires key exchange | Web-based sharing in 1 click |
+| Corporate firewall blocks port 22 | Runs over HTTPS (port 443) |
+
+---
+
+## Features
+
+### Core
+- **Real shell sessions** — node-pty backed, full bash/zsh support
+- **Multi-tab terminal** — side-by-side sessions like your desktop
+- **File explorer** — browse, upload, download files without leaving the browser
+- **WebSocket + xterm.js** — responsive, low-latency typing
+
+### PWA (Install as App)
+- Add to iOS home screen → looks and feels like native app
+- Works offline (shows last session state)
+- Push notifications for tunnel status
+
+### Cloudflare Tunnel (Zero-Config)
+- Create tunnel from UI — no CLI commands
+- Get public HTTPS URL instantly
+- Tunnels survive server restarts
+- Stop/kill tunnels from settings panel
+
+---
+
+## Quick Start
+
+### One-Command Install
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/unn-Known1/webtun/main/install.sh)"
 ```
 
-### Manual setup
+### Manual Setup
 ```bash
 git clone https://github.com/unn-Known1/webtun.git
 cd webtun
 chmod +x setup.sh && ./setup.sh
-```
-
-### Quick launch (if already set up)
-```bash
-cd webtun
 npm start
 ```
 
-The `setup.sh` script handles everything: Node.js install, npm dependencies, `.env` config, systemd service, and optional Cloudflare Tunnel setup.
-
-To expose via your own domain with Cloudflare Tunnel:
-```bash
-cloudflared tunnel create webtun
-cloudflared tunnel route dns webtun yourdomain.com
-cloudflared tunnel run webtun
-```
-
-### 🧪 One-click Colab cell
-
-Run this in a **Google Colab notebook cell** to get a full terminal with a tunnel URL:
-
-```bash
+### Google Colab (Instant Terminal)
+```python
 !rm -rf webtun && git clone https://github.com/unn-Known1/webtun.git && cd webtun && npm install --loglevel=error && node server.js > /tmp/webtun.log 2>&1 & sleep 4 && for i in 1 2 3; do curl -sf http://localhost:3000/api/auth/required >/dev/null && break; sleep 2; done && curl -s -X POST http://localhost:3000/api/tunnel -H 'Content-Type: application/json' -d '{"url":"http://localhost:3000"}' --max-time 20 | python3 -c "import sys,json; d=json.load(sys.stdin); print('🌐 WebTun ready at:', d.get('url','Error: '+d.get('error','')))"
 ```
 
-Opens a persistent, multi-window terminal alongside your Python notebooks. Re-run to get a fresh tunnel URL. Stop with `!kill $(lsof -ti :3000)`.
+---
 
-## 🏗️ Stack
+## Architecture
 
-- **Frontend:** HTML + Vanilla JS (no framework overhead)
-- **Backend:** Node.js + node-pty
-- **Tunnel:** Cloudflare Tunnel (cloudflared)
-- **Protocol:** WebSocket + xterm.js
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Your Browser                            │
+│  ┌─────────┐  ┌──────────┐  ┌────────────┐  ┌────────────┐  │
+│  │ Terminal │  │  File    │  │   Tunnel   │  │  Settings  │  │
+│  │  (xterm) │  │ Explorer │  │   Manager  │  │   Panel    │  │
+│  └────┬────┘  └────┬─────┘  └──────┬─────┘  └─────┬──────┘  │
+│       │            │               │               │         │
+└───────┼────────────┼───────────────┼───────────────┼─────────┘
+        │ WebSocket  │               │               │
+        ▼            ▼               ▼               │
+┌─────────────────────────────────────────────────────────────┐
+│                      Node.js Server                          │
+│  ┌────────────┐  ┌─────────────┐  ┌────────────────────┐   │
+│  │  WebSocket │  │   File API  │  │  Cloudflare Tunnel  │   │
+│  │  Handler   │  │  (read/write)│  │     Manager         │   │
+│  └─────┬──────┘  └──────┬──────┘  └─────────┬──────────┘   │
+│        │               │                     │               │
+│        ▼               ▼                     ▼               │
+│  ┌─────────┐  ┌────────────────┐  ┌──────────────────────┐│
+│  │ node-pty│  │  Local Filesystem│  │ cloudflared daemon   ││
+│  │ (shell) │  │  (your server)   │  │ (exposes to internet)││
+│  └─────────┘  └────────────────┘  └──────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+                    ┌─────────────────┐
+                    │  Internet Users │
+                    │  (HTTPS URL)    │
+                    └─────────────────┘
+```
 
-## 📦 Use Cases
+---
 
-- Access your home server from anywhere
-- Run CLI tools on the go from your phone
-- Give someone terminal access without SSH keys
-- Emergency server access without a laptop
-- **Colab power-up** — run WebTun in a Google Colab notebook cell (`npm start`) and open the tunnel URL in a separate tab for a persistent, multi-window terminal alongside your Python notebooks
+## Use Cases
 
-## 🔗 Tunnel Manager
+| Scenario | Why WebTun |
+|----------|------------|
+| **Home server access** | Access from anywhere without opening ports |
+| **Emergency debugging** | Phone/laptop without SSH client |
+| **Share terminal with friend** | No key exchange, just send URL |
+| **Colab power-up** | Persistent terminal alongside Python notebooks |
+| **Demo environment** | Spin up temp shell for presentations |
+| **Corporate restrictions** | HTTPS works where SSH is blocked |
 
-WebTun has a built-in tunnel manager accessible from the **Settings** (gear icon) → **Tunnel** section:
+---
 
-1. Enter your local URL (default `http://localhost:3000`)
-2. Click **Create** — a Cloudflare Tunnel spawns automatically
-3. Copy the public URL with the copy icon, or click the **red stop square** to kill that tunnel only
+## Tunnel Manager
 
-Tunnel processes are **detached** from the server process — they keep running if the server restarts. Manage them via the Settings panel; tunnels created before a server restart won't appear in the UI (stop them via `kill $(pgrep -f 'cloudflared tunnel')`).
+1. Open **Settings** (gear icon)
+2. Go to **Tunnel** section
+3. Enter URL (default: `http://localhost:3000`)
+4. Click **Create**
+5. Copy the public URL — share it with anyone
 
-## ⭐ If this helped you, star the repo!
+**Note:** Tunnels created before a server restart need manual cleanup:
+```bash
+kill $(pgrep -f 'cloudflared tunnel')
+```
 
-MIT License — built with 💻 by [Gaurang Patel](https://github.com/unn-known1)
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | HTML + Vanilla JS |
+| Backend | Node.js + node-pty |
+| Terminal | xterm.js |
+| Protocol | WebSocket |
+| Tunnel | Cloudflare Tunnel (cloudflared) |
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Tunnel URL not loading | Check Cloudflare account quota at [dash.cloudflare.com](https://dash.cloudflare.com) |
+| Permission denied on shell | Ensure user has shell access: `chsh -s /bin/bash` |
+| File upload fails | Check `public/uploads/` permissions: `chmod 755 public/uploads/` |
+| Port 3000 in use | Change port: `PORT=3001 npm start` |
+
+---
+
+## Contributing
+
+1. Fork → Branch → Commit → PR
+2. Follow existing code style (ES6+, no frameworks)
+3. Test locally with `npm start`
+4. Update this README if adding features
+
+---
+
+## License
+
+MIT — do whatever you want with it.
+
+---
+
+<p align="center">
+  <sub>Made with ❤️ by <a href="https://github.com/unn-known1">Gaurang Patel</a></sub>
+</p>
